@@ -172,18 +172,28 @@ export const processPayment = async (
   }
 
   return new Promise((resolve, reject) => {
+    // Generate a receipt ID for tracking (not Razorpay order_id)
+    const receiptId = `RMF_${Date.now().toString(36).toUpperCase()}`;
+
+    // Razorpay checkout options - Direct checkout mode (without server-side order)
+    // Note: For production, you should create orders server-side for better security
     const options = {
       key: config.keyId,
-      amount: order.amount * 100, // Amount in paise
-      currency: order.currency,
+      amount: order.amount * 100, // Amount in paise (multiply by 100)
+      currency: order.currency || 'INR',
       name: config.companyName,
-      description: `${request.planType.charAt(0).toUpperCase() + request.planType.slice(1)} - ${request.listingTitle}`,
-      order_id: order.orderId, // This should be actual Razorpay order ID in production
+      description: `${request.planType.charAt(0).toUpperCase() + request.planType.slice(1)} Plan - ${request.listingTitle}`,
+      image: 'https://cdn-icons-png.flaticon.com/512/2544/2544087.png', // Home icon
+      // NOTE: We're NOT using order_id for direct checkout mode
+      // order_id should only be used when orders are created server-side
+      receipt: receiptId,
       handler: async (response: any) => {
+        console.log('✅ Payment successful:', response);
+
         const result: PaymentResult = {
           success: true,
-          paymentId: response.razorpay_payment_id || generatePaymentId(),
-          orderId: order.orderId,
+          paymentId: response.razorpay_payment_id,
+          orderId: receiptId, // Use our receipt ID as order reference
           signature: response.razorpay_signature,
           amount: order.amount,
           timestamp: new Date(),
@@ -196,35 +206,59 @@ export const processPayment = async (
       },
       prefill: {
         name: request.userName,
-        email: request.userEmail,
+        email: request.userEmail || '',
         contact: request.userPhone,
       },
       notes: {
         listingId: request.listingId,
         listingType: request.listingType,
+        listingTitle: request.listingTitle,
         planType: request.planType,
+        ownerName: ownerDetails.name,
+        ownerPhone: ownerDetails.phone,
         ...request.notes,
       },
-      theme: config.theme,
+      theme: {
+        color: config.theme.color,
+        backdrop_color: 'rgba(0, 0, 0, 0.6)',
+      },
       modal: {
         ondismiss: () => {
+          console.log('🚫 Payment modal dismissed by user');
           reject(new Error('Payment cancelled by user'));
         },
         escape: true,
         animation: true,
+        confirm_close: true,
+      },
+      retry: {
+        enabled: true,
+        max_count: 3,
       },
     };
 
     try {
-      const rzp = new window.Razorpay(options);
-      rzp.on('payment.failed', (response: any) => {
-        const error = response.error || {};
-        reject(new Error(error.description || 'Payment failed'));
+      console.log('🔄 Initializing Razorpay checkout with options:', {
+        key: config.keyId,
+        amount: options.amount,
+        currency: options.currency,
+        name: options.name,
       });
+
+      const rzp = new window.Razorpay(options);
+
+      rzp.on('payment.failed', (response: any) => {
+        console.error('❌ Payment failed:', response.error);
+        const error = response.error || {};
+        reject(new Error(error.description || error.reason || 'Payment failed. Please try again.'));
+      });
+
       rzp.open();
+      console.log('✅ Razorpay checkout modal opened');
     } catch (error: any) {
-      console.error('Razorpay error:', error);
-      // Fallback to simulation
+      console.error('❌ Razorpay initialization error:', error);
+      // Fallback to demo simulation on any error
+      logger.warn('Razorpay failed, falling back to demo mode: ' + error.message, { context: 'Payment' });
       simulatePayment(order, request, ownerDetails).then(resolve).catch(reject);
     }
   });
