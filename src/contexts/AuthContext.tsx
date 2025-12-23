@@ -78,9 +78,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     password: string,
     metadata: { first_name: string; last_name: string; role: string }
   ) => {
-    const redirectUrl = `${window.location.origin}/`;
+    // Use VITE_SITE_URL for production, or fall back to window.location.origin
+    const siteUrl = import.meta.env.VITE_SITE_URL || window.location.origin;
+    const redirectUrl = `${siteUrl}/`;
 
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -88,6 +90,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         data: metadata,
       },
     });
+
+    // Sign out immediately after signup so user sees the confirmation page
+    // instead of being auto-logged in (Supabase auto-logs in if email confirm is disabled)
+    if (!error && data.session) {
+      await supabase.auth.signOut();
+    }
 
     return { error: error as Error | null };
   };
