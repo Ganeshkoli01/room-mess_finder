@@ -317,56 +317,57 @@ const ContactOwnerModal = ({
                         </div>
                     </div>
 
-                    {/* Quick Contact */}
-                    <div className="flex gap-2 mt-4">
+                    {/* Quick Contact - Stack on very small screens */}
+                    <div className="grid grid-cols-2 gap-2 mt-4">
                         <Button
                             variant="outline"
                             size="sm"
-                            className="flex-1 gap-2 bg-white dark:bg-gray-900"
+                            className="gap-1 text-xs sm:text-sm bg-white dark:bg-gray-900 truncate"
                             onClick={handlePhoneCall}
                         >
-                            <Phone className="w-4 h-4" />
-                            {owner.phone}
+                            <Phone className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+                            <span className="truncate">{owner.phone}</span>
                         </Button>
                         <Button
                             variant="outline"
                             size="sm"
-                            className="gap-2 bg-green-50 border-green-200 text-green-700 hover:bg-green-100 dark:bg-green-950 dark:border-green-800 dark:text-green-300"
+                            className="gap-1 text-xs sm:text-sm bg-green-50 border-green-200 text-green-700 hover:bg-green-100 dark:bg-green-950 dark:border-green-800 dark:text-green-300"
                             onClick={handleWhatsAppInquiry}
                         >
-                            <MessageCircle className="w-4 h-4" />
+                            <MessageCircle className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
                             WhatsApp
                         </Button>
                     </div>
                 </div>
 
-                {/* Tabs */}
+                {/* Tabs - Smaller on mobile */}
                 <div className="flex gap-2 mb-4">
                     <button
                         onClick={() => setActiveTab("book")}
-                        className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-all ${activeTab === "book"
+                        className={`flex-1 py-2 px-2 sm:px-4 rounded-lg text-xs sm:text-sm font-medium transition-all ${activeTab === "book"
                             ? "bg-indigo-600 text-white"
                             : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
                             }`}
                     >
-                        <CreditCard className="w-4 h-4 inline mr-2" />
-                        {listingType === "room" ? "Book & Pay" : "Subscribe & Pay"}
+                        <CreditCard className="w-3 h-3 sm:w-4 sm:h-4 inline mr-1 sm:mr-2" />
+                        <span className="hidden sm:inline">{listingType === "room" ? "Book & Pay" : "Subscribe & Pay"}</span>
+                        <span className="sm:hidden">{listingType === "room" ? "Book" : "Subscribe"}</span>
                     </button>
                     <button
                         onClick={() => setActiveTab("contact")}
-                        className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-all ${activeTab === "contact"
+                        className={`flex-1 py-2 px-2 sm:px-4 rounded-lg text-xs sm:text-sm font-medium transition-all ${activeTab === "contact"
                             ? "bg-indigo-600 text-white"
                             : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
                             }`}
                     >
-                        <MessageCircle className="w-4 h-4 inline mr-2" />
-                        Contact Only
+                        <MessageCircle className="w-3 h-3 sm:w-4 sm:h-4 inline mr-1 sm:mr-2" />
+                        Contact
                     </button>
                 </div>
 
                 {/* Form */}
-                <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-3 sm:space-y-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div className="space-y-1.5">
                             <Label htmlFor="userName" className="text-sm">Your Name *</Label>
                             <Input
@@ -548,38 +549,41 @@ const ContactOwnerModal = ({
                     {/* Action Buttons */}
                     {activeTab === "book" ? (
                         <Button
-                            className="w-full gap-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white h-12"
+                            className="w-full gap-1 sm:gap-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white h-11 sm:h-12 text-sm sm:text-base"
                             onClick={handlePayment}
                             disabled={isProcessing}
                         >
                             {isProcessing ? (
                                 <>
-                                    <Loader2 className="w-5 h-5 animate-spin" />
-                                    Processing...
+                                    <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin" />
+                                    <span className="hidden sm:inline">Processing...</span>
+                                    <span className="sm:hidden">Processing</span>
                                 </>
                             ) : (
                                 <>
-                                    <CreditCard className="w-5 h-5" />
-                                    Pay ₹{pricing.total.toLocaleString("en-IN")} & {listingType === "room" ? "Book" : "Subscribe"}
+                                    <CreditCard className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
+                                    <span className="truncate">
+                                        Pay ₹{pricing.total.toLocaleString("en-IN")} & {listingType === "room" ? "Book" : "Subscribe"}
+                                    </span>
                                 </>
                             )}
                         </Button>
                     ) : (
-                        <div className="flex gap-3">
+                        <div className="grid grid-cols-2 gap-2">
                             <Button
-                                className="flex-1 gap-2 bg-green-600 hover:bg-green-700 h-12"
+                                className="gap-1 sm:gap-2 bg-green-600 hover:bg-green-700 h-11 sm:h-12 text-sm sm:text-base"
                                 onClick={handleWhatsAppInquiry}
                             >
-                                <MessageCircle className="w-5 h-5" />
+                                <MessageCircle className="w-4 h-4 sm:w-5 sm:h-5" />
                                 WhatsApp
                             </Button>
                             <Button
                                 variant="outline"
-                                className="flex-1 gap-2 h-12"
+                                className="gap-1 sm:gap-2 h-11 sm:h-12 text-sm sm:text-base"
                                 onClick={handlePhoneCall}
                             >
-                                <Phone className="w-5 h-5" />
-                                Call Now
+                                <Phone className="w-4 h-4 sm:w-5 sm:h-5" />
+                                Call
                             </Button>
                         </div>
                     )}

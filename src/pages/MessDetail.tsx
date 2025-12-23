@@ -294,9 +294,43 @@ const MessDetail = () => {
                     </button>
                 </div>
 
-                {/* Image Gallery */}
-                <div className="container mx-auto px-4 mb-8">
-                    <div className="grid grid-cols-4 grid-rows-2 gap-2 h-[500px] rounded-2xl overflow-hidden">
+                {/* Image Gallery - Mobile: Single image with swipe, Desktop: Grid */}
+                <div className="container mx-auto px-4 mb-6 md:mb-8">
+                    {/* Mobile Image Carousel */}
+                    <div className="block md:hidden relative h-[250px] sm:h-[300px] rounded-xl overflow-hidden">
+                        <img
+                            src={images[currentImageIndex]}
+                            alt={displayMess.name}
+                            className="w-full h-full object-cover"
+                        />
+                        {/* Navigation arrows */}
+                        <button
+                            onClick={prevImage}
+                            className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-black/50 rounded-full flex items-center justify-center text-white"
+                        >
+                            <ChevronLeft className="w-5 h-5" />
+                        </button>
+                        <button
+                            onClick={nextImage}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-black/50 rounded-full flex items-center justify-center text-white"
+                        >
+                            <ChevronRight className="w-5 h-5" />
+                        </button>
+                        {/* Image counter */}
+                        <div className="absolute bottom-2 left-1/2 -translate-x-1/2 px-3 py-1 bg-black/50 rounded-full text-white text-sm">
+                            {currentImageIndex + 1} / {images.length}
+                        </div>
+                        {/* View all button */}
+                        <button
+                            onClick={() => setShowGallery(true)}
+                            className="absolute bottom-2 right-2 px-3 py-1 bg-white/90 rounded-lg text-sm font-medium"
+                        >
+                            View All
+                        </button>
+                    </div>
+
+                    {/* Desktop Grid Gallery */}
+                    <div className="hidden md:grid grid-cols-4 grid-rows-2 gap-2 h-[400px] lg:h-[500px] rounded-2xl overflow-hidden">
                         {/* Main Image */}
                         <div
                             className="col-span-2 row-span-2 relative cursor-pointer group"
@@ -328,7 +362,7 @@ const MessDetail = () => {
                                 <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
                                 {index === 3 && images.length > 5 && (
                                     <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                                        <span className="text-white font-semibold text-xl">+{images.length - 5} more</span>
+                                        <span className="text-white font-semibold text-lg">+{images.length - 5} more</span>
                                     </div>
                                 )}
                             </div>
@@ -369,7 +403,7 @@ const MessDetail = () => {
                                                 </Badge>
                                             )}
                                         </div>
-                                        <h1 className="font-heading font-bold text-3xl text-foreground">
+                                        <h1 className="font-heading font-bold text-xl sm:text-2xl md:text-3xl text-foreground">
                                             {displayMess.name}
                                         </h1>
                                         <p className="flex items-center gap-2 text-muted-foreground mt-2">
@@ -604,17 +638,17 @@ const MessDetail = () => {
                                         </div>
                                     </div>
 
-                                    {/* Quick Contact Buttons */}
+                                    {/* Quick Contact Buttons - Responsive grid */}
                                     {displayMess.contact?.hasContact && (
-                                        <div className="flex gap-2 mt-4">
+                                        <div className="grid grid-cols-2 sm:flex gap-2 mt-4">
                                             {displayMess.contact?.phone && (
                                                 <Button
                                                     variant="outline"
                                                     size="sm"
-                                                    className="gap-1"
+                                                    className="gap-1 text-xs sm:text-sm"
                                                     onClick={() => makePhoneCall(displayMess.contact.phone)}
                                                 >
-                                                    <Phone className="w-4 h-4" />
+                                                    <Phone className="w-3 h-3 sm:w-4 sm:h-4" />
                                                     Call
                                                 </Button>
                                             )}
@@ -622,10 +656,10 @@ const MessDetail = () => {
                                                 <Button
                                                     variant="outline"
                                                     size="sm"
-                                                    className="gap-1"
+                                                    className="gap-1 text-xs sm:text-sm"
                                                     onClick={() => window.open(displayMess.contact.website, '_blank')}
                                                 >
-                                                    <Globe className="w-4 h-4" />
+                                                    <Globe className="w-3 h-3 sm:w-4 sm:h-4" />
                                                     Website
                                                 </Button>
                                             )}
@@ -633,10 +667,10 @@ const MessDetail = () => {
                                                 <Button
                                                     variant="outline"
                                                     size="sm"
-                                                    className="gap-1"
+                                                    className="gap-1 text-xs sm:text-sm col-span-2 sm:col-span-1"
                                                     onClick={() => window.open(`mailto:${displayMess.contact.email}`, '_blank')}
                                                 >
-                                                    <Mail className="w-4 h-4" />
+                                                    <Mail className="w-3 h-3 sm:w-4 sm:h-4" />
                                                     Email
                                                 </Button>
                                             )}
@@ -654,32 +688,35 @@ const MessDetail = () => {
                                         <IndianRupee className="w-5 h-5" />
                                         Subscribe Now
                                     </Button>
-                                    {displayMess.contact?.phone && (
-                                        <Button
-                                            variant="outline"
-                                            className="w-full gap-2 border-green-500 text-green-600 hover:bg-green-50"
-                                            size="lg"
-                                            onClick={() => {
-                                                const phone = displayMess.contact.phone;
-                                                const message = `Hi, I'm interested in subscribing to "${displayMess.name}" mess listed on RoomAndMess. Please share subscription details.`;
-                                                window.open(`https://wa.me/${phone.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`, '_blank');
-                                            }}
-                                        >
-                                            <MessageCircle className="w-5 h-5" />
-                                            WhatsApp Inquiry
-                                        </Button>
-                                    )}
-                                    {displayMess.contact?.phone && (
-                                        <Button
-                                            variant="outline"
-                                            className="w-full gap-2"
-                                            size="lg"
-                                            onClick={() => makePhoneCall(displayMess.contact.phone)}
-                                        >
-                                            <Phone className="w-5 h-5" />
-                                            Call Now
-                                        </Button>
-                                    )}
+                                    {/* Mobile: 2 buttons side by side */}
+                                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-1">
+                                        {displayMess.contact?.phone && (
+                                            <Button
+                                                variant="outline"
+                                                className="gap-1 sm:gap-2 border-green-500 text-green-600 hover:bg-green-50 text-xs sm:text-sm"
+                                                size="default"
+                                                onClick={() => {
+                                                    const phone = displayMess.contact.phone;
+                                                    const message = `Hi, I'm interested in subscribing to "${displayMess.name}" mess listed on RoomAndMess. Please share subscription details.`;
+                                                    window.open(`https://wa.me/${phone.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`, '_blank');
+                                                }}
+                                            >
+                                                <MessageCircle className="w-4 h-4" />
+                                                WhatsApp
+                                            </Button>
+                                        )}
+                                        {displayMess.contact?.phone && (
+                                            <Button
+                                                variant="outline"
+                                                className="gap-1 sm:gap-2 text-xs sm:text-sm"
+                                                size="default"
+                                                onClick={() => makePhoneCall(displayMess.contact.phone)}
+                                            >
+                                                <Phone className="w-4 h-4" />
+                                                Call
+                                            </Button>
+                                        )}
+                                    </div>
                                 </div>
 
                                 {/* Quick Info */}
