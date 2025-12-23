@@ -118,7 +118,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const resetPassword = async (email: string) => {
-    const redirectUrl = `${window.location.origin}/auth?mode=reset`;
+    // Use VITE_SITE_URL for production, or fall back to window.location.origin
+    // Make sure to set VITE_SITE_URL in Vercel environment variables
+    const siteUrl = import.meta.env.VITE_SITE_URL || window.location.origin;
+    const redirectUrl = `${siteUrl}/auth?mode=reset`;
+
+    console.log('Password reset redirect URL:', redirectUrl);
 
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: redirectUrl,
