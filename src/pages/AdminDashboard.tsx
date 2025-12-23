@@ -221,29 +221,65 @@ const AdminDashboard = () => {
   const fetchAllUsers = async () => {
     setLoadingUsers(true);
     try {
-      // Get profiles
-      const { data: profilesData, error: profilesError } = await supabase
-        .from("profiles")
-        .select("id, user_id, first_name, last_name, phone, created_at")
+      // Get all user roles first
+      const { data: rolesData, error: rolesError } = await supabase
+        .from("user_roles")
+        .select("user_id, role, created_at")
         .order("created_at", { ascending: false });
 
-      if (profilesError) throw profilesError;
+      if (rolesError) {
+        console.error("Error fetching roles:", rolesError);
+      }
 
-      // Get user roles
-      const { data: rolesData } = await supabase
-        .from("user_roles")
-        .select("user_id, role");
+      // Get all profiles
+      const { data: profilesData, error: profilesError } = await supabase
+        .from("profiles")
+        .select("user_id, first_name, last_name, phone, created_at");
 
-      // Combine profiles with roles
-      const usersWithRoles = (profilesData || []).map(profile => {
-        const roleEntry = rolesData?.find(r => r.user_id === profile.user_id);
-        return {
-          id: profile.user_id,
-          email: profile.phone || profile.user_id?.substring(0, 8) + "...",
-          full_name: `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || "User",
-          role: roleEntry?.role || "user",
-          created_at: profile.created_at,
-        };
+      if (profilesError) {
+        console.error("Error fetching profiles:", profilesError);
+      }
+
+      // Combine data - start with profiles and add roles
+      const usersMap = new Map<string, UserItem>();
+
+      // Add users from profiles
+      (profilesData || []).forEach(profile => {
+        if (profile.user_id) {
+          usersMap.set(profile.user_id, {
+            id: profile.user_id,
+            email: profile.phone || profile.user_id?.substring(0, 8) + "...",
+            full_name: `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || "User",
+            role: "user",
+            created_at: profile.created_at,
+          });
+        }
+      });
+
+      // Add/update users from roles (this ensures users with roles but no profile are included)
+      (rolesData || []).forEach(roleEntry => {
+        if (roleEntry.user_id) {
+          const existingUser = usersMap.get(roleEntry.user_id);
+          if (existingUser) {
+            // Update role for existing user
+            existingUser.role = roleEntry.role;
+          } else {
+            // Add user that has role but no profile
+            usersMap.set(roleEntry.user_id, {
+              id: roleEntry.user_id,
+              email: roleEntry.user_id?.substring(0, 12) + "...",
+              full_name: "User (No Profile)",
+              role: roleEntry.role,
+              created_at: roleEntry.created_at,
+            });
+          }
+        }
+      });
+
+      // Convert map to array and sort by role priority (admin first, then owner, then user)
+      const usersWithRoles = Array.from(usersMap.values()).sort((a, b) => {
+        const rolePriority: Record<string, number> = { admin: 0, owner: 1, user: 2 };
+        return (rolePriority[a.role] ?? 2) - (rolePriority[b.role] ?? 2);
       });
 
       setAllUsers(usersWithRoles);
