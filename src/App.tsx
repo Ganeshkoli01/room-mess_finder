@@ -15,6 +15,7 @@ import CookieConsent from "@/components/CookieConsent";
 // Lazy load pages for better performance
 const Index = lazy(() => import("./pages/Index"));
 const Auth = lazy(() => import("./pages/Auth"));
+const EmailConfirmation = lazy(() => import("./pages/EmailConfirmation"));
 const RoomListings = lazy(() => import("./pages/RoomListings"));
 const RoomDetail = lazy(() => import("./pages/RoomDetail"));
 const MessListings = lazy(() => import("./pages/MessListings"));
@@ -82,6 +83,7 @@ const App = () => (
                           <Route path="/auth" element={<Auth />} />
                           <Route path="/login" element={<Auth />} />
                           <Route path="/register" element={<Auth />} />
+                          <Route path="/email-confirmation" element={<EmailConfirmation />} />
                           <Route path="/rooms" element={<RoomListings />} />
                           <Route path="/rooms/:id" element={<RoomDetail />} />
                           <Route path="/mess" element={<MessListings />} />

@@ -120,8 +120,8 @@ const Auth = () => {
             toast({ title: "Error", description: error.message, variant: "destructive" });
           }
         } else {
-          toast({ title: "Account created!", description: "Welcome to Room & Mess!" });
-          navigate("/");
+          // Redirect to email confirmation page with email as parameter
+          navigate(`/email-confirmation?email=${encodeURIComponent(formData.email)}`);
         }
       }
     } catch (error) {
