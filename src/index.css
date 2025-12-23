@@ -1721,11 +1721,11 @@ svg {
     overflow-y: auto;
   }
 
-  /* Ensure cards don't overflow */
+  /* Ensure cards don't overflow horizontally */
   .rounded-2xl,
   .rounded-xl {
     max-width: 100%;
-    overflow: hidden;
+    /* Note: Don't use overflow:hidden here - it cuts off text on right side */
   }
 
   /* Better grid layouts on small screens */

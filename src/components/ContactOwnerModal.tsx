@@ -268,7 +268,7 @@ const ContactOwnerModal = ({
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="sm:max-w-lg">
+            <DialogContent className="sm:max-w-lg max-h-[90vh] max-h-[90dvh] overflow-y-auto">
                 <DialogHeader className="pb-2">
                     <DialogTitle className="flex items-center gap-2 text-xl">
                         {listingType === "room" ? "🏠 Book This Room" : "🍽️ Subscribe to Mess"}
