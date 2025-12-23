@@ -1,4 +1,6 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 import {
     Dialog,
     DialogContent,
@@ -72,6 +74,25 @@ const ContactOwnerModal = ({
     contact,
 }: ContactOwnerModalProps) => {
     const { toast } = useToast();
+    const { user } = useAuth();
+    const navigate = useNavigate();
+
+    // Check if user is logged in when modal opens
+    useEffect(() => {
+        if (isOpen && !user) {
+            // Close modal and redirect to login
+            onClose();
+            toast({
+                title: "Login Required",
+                description: "Please login to book a room, subscribe to mess, or send an inquiry.",
+                variant: "destructive",
+            });
+            // Redirect to auth page after a short delay
+            setTimeout(() => {
+                navigate("/auth", { state: { from: window.location.pathname } });
+            }, 500);
+        }
+    }, [isOpen, user, onClose, navigate, toast]);
 
     // Owner and business data
     const [owner, setOwner] = useState<OwnerDetails | null>(null);
