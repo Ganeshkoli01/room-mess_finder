@@ -42,7 +42,7 @@ const BackToTop = () => {
                     whileHover={{ scale: 1.1 }}
                     whileTap={{ scale: 0.9 }}
                     onClick={scrollToTop}
-                    className="fixed bottom-24 right-6 z-40 w-12 h-12 rounded-full bg-card shadow-lg border border-border/50 flex items-center justify-center group overflow-hidden"
+                    className="fixed bottom-24 left-4 md:bottom-24 md:right-6 md:left-auto z-40 w-10 h-10 md:w-12 md:h-12 rounded-full bg-card shadow-lg border border-border/50 flex items-center justify-center group overflow-hidden"
                     aria-label="Back to top"
                 >
                     {/* Progress ring */}

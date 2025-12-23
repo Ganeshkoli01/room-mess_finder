@@ -1603,6 +1603,57 @@ svg {
     animation: none;
     opacity: 0.1;
   }
+
+  /* Better touch targets on mobile */
+  button,
+  a,
+  input,
+  select,
+  textarea {
+    min-height: 44px;
+  }
+
+  /* Ensure proper spacing for fixed bottom elements */
+  .fixed.bottom-6 {
+    bottom: max(1.5rem, env(safe-area-inset-bottom));
+  }
+
+  /* Reduce padding on mobile for more content space */
+  .container {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  /* Improve readability on mobile */
+  p, li {
+    font-size: 1rem;
+    line-height: 1.6;
+  }
+
+  /* Smooth scrolling with momentum */
+  html {
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Prevent horizontal overflow */
+  body {
+    overflow-x: hidden;
+  }
+
+  /* Make sure modals and overlays don't extend beyond viewport */
+  .fixed.inset-0 {
+    max-height: 100vh;
+    max-height: 100dvh;
+  }
+}
+
+/* Safe area support for notched phones */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .fixed.bottom-20,
+  .fixed.bottom-24 {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
 }
 
 /* High refresh rate optimization */

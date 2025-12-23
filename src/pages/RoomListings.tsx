@@ -476,9 +476,9 @@ const RoomListings = () => {
               </div>
             </aside>
 
-            {/* Mobile Filter Button */}
-            <div className="lg:hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-40">
-              <Button onClick={() => setShowFilters(true)} className="shadow-lg gap-2">
+            {/* Mobile Filter Button - positioned to avoid chat bubble */}
+            <div className="lg:hidden fixed bottom-20 left-4 z-40">
+              <Button onClick={() => setShowFilters(true)} className="shadow-lg gap-2" size="sm">
                 <Filter className="w-4 h-4" />
                 Filters
               </Button>

@@ -261,38 +261,41 @@ const ChatBot = () => {
 
     return (
         <>
-            {/* Chat Button */}
+            {/* Chat Button - smaller on mobile to avoid overlap */}
             {!isOpen && (
                 <button
                     onClick={() => setIsOpen(true)}
-                    className="fixed bottom-6 right-6 z-50 group"
+                    className="fixed bottom-20 right-4 md:bottom-6 md:right-6 z-50 group"
                 >
                     <div className="relative">
                         {/* Glow effect */}
                         <div className="absolute inset-0 bg-gradient-to-r from-primary to-accent rounded-full blur-lg opacity-50 group-hover:opacity-75 transition-opacity animate-pulse" />
 
-                        {/* Button */}
-                        <div className="relative w-16 h-16 bg-gradient-to-r from-primary to-accent rounded-full shadow-lg flex items-center justify-center transform group-hover:scale-110 transition-transform">
-                            <MessageCircle className="w-7 h-7 text-white" />
+                        {/* Button - smaller on mobile */}
+                        <div className="relative w-12 h-12 md:w-16 md:h-16 bg-gradient-to-r from-primary to-accent rounded-full shadow-lg flex items-center justify-center transform group-hover:scale-110 transition-transform">
+                            <MessageCircle className="w-5 h-5 md:w-7 md:h-7 text-white" />
                         </div>
 
                         {/* Badge */}
-                        <div className="absolute -top-1 -right-1 w-5 h-5 bg-success rounded-full flex items-center justify-center">
-                            <Sparkles className="w-3 h-3 text-white" />
+                        <div className="absolute -top-1 -right-1 w-4 h-4 md:w-5 md:h-5 bg-success rounded-full flex items-center justify-center">
+                            <Sparkles className="w-2.5 h-2.5 md:w-3 md:h-3 text-white" />
                         </div>
                     </div>
 
-                    {/* Tooltip */}
-                    <div className="absolute bottom-full right-0 mb-2 px-3 py-1.5 bg-foreground text-background text-sm rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                    {/* Tooltip - hidden on mobile */}
+                    <div className="hidden md:block absolute bottom-full right-0 mb-2 px-3 py-1.5 bg-foreground text-background text-sm rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
                         Chat with RoomMate AI
                     </div>
                 </button>
             )}
 
-            {/* Chat Window */}
+            {/* Chat Window - Full screen on mobile */}
             {isOpen && (
                 <div
-                    className={`fixed bottom-6 right-6 z-50 bg-card rounded-2xl shadow-2xl border border-border overflow-hidden transition-all duration-300 ${isMinimized ? "w-80 h-16" : "w-96 h-[600px] max-h-[80vh]"
+                    className={`fixed z-50 bg-card shadow-2xl border border-border overflow-hidden transition-all duration-300 
+                        ${isMinimized
+                            ? "bottom-6 right-6 w-80 h-16 rounded-2xl"
+                            : "inset-0 md:inset-auto md:bottom-6 md:right-6 md:w-96 md:h-[600px] md:max-h-[80vh] md:rounded-2xl"
                         }`}
                 >
                     {/* Header */}
