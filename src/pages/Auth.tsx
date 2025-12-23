@@ -1,11 +1,11 @@
-import { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Building2, Mail, Lock, Eye, EyeOff, ArrowRight, User, Phone, Loader2 } from "lucide-react";
+import { Building2, Mail, Lock, Eye, EyeOff, ArrowRight, User, Phone, Loader2, ArrowLeft, CheckCircle } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -13,6 +13,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
 
@@ -27,9 +34,18 @@ const signUpSchema = z.object({
 });
 
 const Auth = () => {
+  const [searchParams] = useSearchParams();
   const [isLogin, setIsLogin] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [forgotPasswordEmail, setForgotPasswordEmail] = useState("");
+  const [forgotPasswordLoading, setForgotPasswordLoading] = useState(false);
+  const [forgotPasswordSent, setForgotPasswordSent] = useState(false);
+  const [isResetMode, setIsResetMode] = useState(false);
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [resetPasswordLoading, setResetPasswordLoading] = useState(false);
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
@@ -41,10 +57,18 @@ const Auth = () => {
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const { signIn, signUp, signInWithGoogle } = useAuth();
+  const { signIn, signUp, signInWithGoogle, resetPassword, updatePassword } = useAuth();
   const [googleLoading, setGoogleLoading] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
+
+  // Check if user is coming from password reset link
+  useEffect(() => {
+    const mode = searchParams.get("mode");
+    if (mode === "reset") {
+      setIsResetMode(true);
+    }
+  }, [searchParams]);
 
   const handleChange = (field: string, value: string | boolean) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -209,9 +233,13 @@ const Auth = () => {
               <div className="flex items-center justify-between">
                 <Label htmlFor="password">Password</Label>
                 {isLogin && (
-                  <a href="#" className="text-sm text-primary hover:underline">
+                  <button
+                    type="button"
+                    onClick={() => setShowForgotPassword(true)}
+                    className="text-sm text-primary hover:underline"
+                  >
                     Forgot Password?
-                  </a>
+                  </button>
                 )}
               </div>
               <div className="relative">
@@ -355,6 +383,181 @@ const Auth = () => {
           </div>
         </div>
       </div>
+
+      {/* Forgot Password Modal */}
+      <Dialog open={showForgotPassword} onOpenChange={setShowForgotPassword}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-heading">
+              {forgotPasswordSent ? "Check Your Email" : "Forgot Password?"}
+            </DialogTitle>
+            <DialogDescription>
+              {forgotPasswordSent
+                ? "We've sent a password reset link to your email address."
+                : "Enter your email address and we'll send you a link to reset your password."}
+            </DialogDescription>
+          </DialogHeader>
+
+          {forgotPasswordSent ? (
+            <div className="space-y-4">
+              <div className="flex items-center justify-center py-4">
+                <div className="w-16 h-16 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+                  <CheckCircle className="w-8 h-8 text-green-600 dark:text-green-400" />
+                </div>
+              </div>
+              <p className="text-center text-muted-foreground text-sm">
+                Please check your inbox at <strong>{forgotPasswordEmail}</strong> and click the reset link.
+                Don't forget to check your spam folder!
+              </p>
+              <Button
+                className="w-full"
+                onClick={() => {
+                  setShowForgotPassword(false);
+                  setForgotPasswordSent(false);
+                  setForgotPasswordEmail("");
+                }}
+              >
+                Back to Login
+              </Button>
+            </div>
+          ) : (
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                if (!forgotPasswordEmail) {
+                  toast({ title: "Error", description: "Please enter your email address", variant: "destructive" });
+                  return;
+                }
+                setForgotPasswordLoading(true);
+                const { error } = await resetPassword(forgotPasswordEmail);
+                if (error) {
+                  toast({ title: "Error", description: error.message, variant: "destructive" });
+                } else {
+                  setForgotPasswordSent(true);
+                }
+                setForgotPasswordLoading(false);
+              }}
+              className="space-y-4"
+            >
+              <div className="space-y-2">
+                <Label htmlFor="forgot-email">Email Address</Label>
+                <div className="relative">
+                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                  <Input
+                    id="forgot-email"
+                    type="email"
+                    value={forgotPasswordEmail}
+                    onChange={(e) => setForgotPasswordEmail(e.target.value)}
+                    placeholder="you@example.com"
+                    className="pl-12 h-12"
+                    required
+                  />
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => setShowForgotPassword(false)}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" className="flex-1 gap-2" disabled={forgotPasswordLoading}>
+                  {forgotPasswordLoading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <>
+                      Send Link
+                      <ArrowRight className="w-4 h-4" />
+                    </>
+                  )}
+                </Button>
+              </div>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Reset Password Modal (when coming from email link) */}
+      <Dialog open={isResetMode} onOpenChange={(open) => !open && navigate("/auth")}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-heading">Reset Your Password</DialogTitle>
+            <DialogDescription>
+              Enter your new password below. Make sure it's at least 6 characters long.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form
+            onSubmit={async (e) => {
+              e.preventDefault();
+              if (newPassword.length < 6) {
+                toast({ title: "Error", description: "Password must be at least 6 characters", variant: "destructive" });
+                return;
+              }
+              if (newPassword !== confirmPassword) {
+                toast({ title: "Error", description: "Passwords do not match", variant: "destructive" });
+                return;
+              }
+              setResetPasswordLoading(true);
+              const { error } = await updatePassword(newPassword);
+              if (error) {
+                toast({ title: "Error", description: error.message, variant: "destructive" });
+              } else {
+                toast({ title: "Success!", description: "Your password has been updated. Please login with your new password." });
+                setIsResetMode(false);
+                navigate("/auth");
+              }
+              setResetPasswordLoading(false);
+            }}
+            className="space-y-4"
+          >
+            <div className="space-y-2">
+              <Label htmlFor="new-password">New Password</Label>
+              <div className="relative">
+                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                <Input
+                  id="new-password"
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Enter new password"
+                  className="pl-12 h-12"
+                  required
+                  minLength={6}
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="confirm-password">Confirm Password</Label>
+              <div className="relative">
+                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                <Input
+                  id="confirm-password"
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Confirm new password"
+                  className="pl-12 h-12"
+                  required
+                  minLength={6}
+                />
+              </div>
+            </div>
+            <Button type="submit" className="w-full gap-2" disabled={resetPasswordLoading}>
+              {resetPasswordLoading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <>
+                  Update Password
+                  <ArrowRight className="w-4 h-4" />
+                </>
+              )}
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
