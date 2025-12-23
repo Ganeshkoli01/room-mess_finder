@@ -186,73 +186,82 @@ const ContactOwnerModal = ({
     const handlePayment = async () => {
         if (!validateForm() || !owner) return;
 
-        setIsProcessing(true);
+        // Save form data for payment processing
+        const paymentFormData = { ...formData };
+        const paymentPricing = { ...pricing };
+        const planType = getPlanType();
 
-        try {
-            // Create order
-            const order = await createOrder({
-                amount: pricing.total,
-                listingId,
-                listingType,
-                listingTitle: listingName,
-                planType: listingType === "room" ? "booking" : getPlanType(),
-                userId: `user_${Date.now()}`,
-                userEmail: formData.userEmail || `${formData.userPhone}@temp.com`,
-                userName: formData.userName,
-                userPhone: formData.userPhone,
-            });
+        // Close modal BEFORE opening Razorpay to prevent z-index issues
+        onClose();
 
-            // Process payment
-            const result = await processPayment(order, {
-                amount: pricing.total,
-                listingId,
-                listingType,
-                listingTitle: listingName,
-                planType: listingType === "room" ? "booking" : getPlanType(),
-                userId: `user_${Date.now()}`,
-                userEmail: formData.userEmail || `${formData.userPhone}@temp.com`,
-                userName: formData.userName,
-                userPhone: formData.userPhone,
-            }, {
-                name: owner.ownerName,
-                phone: owner.phone,
-            });
+        // Wait for modal close animation to complete
+        setTimeout(async () => {
+            setIsProcessing(true);
 
-            if (result.success) {
-                toast({
-                    title: "🎉 Booking Successful!",
-                    description: `Your ${listingType === "room" ? "room booking" : "mess subscription"} is confirmed. Payment ID: ${result.paymentId}`,
-                });
-
-                // Store inquiry
-                storeInquiry({
+            try {
+                // Create order
+                const order = await createOrder({
+                    amount: paymentPricing.total,
                     listingId,
-                    listingName,
                     listingType,
-                    userName: formData.userName,
-                    userPhone: formData.userPhone,
-                    userEmail: formData.userEmail,
-                    message: formData.message,
-                    inquiryType: listingType === "room" ? "booking" : "subscription",
-                    moveInDate: formData.moveInDate,
-                    stayDuration: formData.stayDuration,
-                    mealPlan: formData.mealPlan,
-                    subscriptionDuration: formData.subscriptionDuration,
+                    listingTitle: listingName,
+                    planType: listingType === "room" ? "booking" : planType,
+                    userId: `user_${Date.now()}`,
+                    userEmail: paymentFormData.userEmail || `${paymentFormData.userPhone}@temp.com`,
+                    userName: paymentFormData.userName,
+                    userPhone: paymentFormData.userPhone,
                 });
 
-                onClose();
-            }
-        } catch (error: any) {
-            if (error.message !== "Payment cancelled by user") {
-                toast({
-                    title: "Payment Failed",
-                    description: error.message || "Something went wrong. Please try again.",
-                    variant: "destructive",
+                // Process payment
+                const result = await processPayment(order, {
+                    amount: paymentPricing.total,
+                    listingId,
+                    listingType,
+                    listingTitle: listingName,
+                    planType: listingType === "room" ? "booking" : planType,
+                    userId: `user_${Date.now()}`,
+                    userEmail: paymentFormData.userEmail || `${paymentFormData.userPhone}@temp.com`,
+                    userName: paymentFormData.userName,
+                    userPhone: paymentFormData.userPhone,
+                }, {
+                    name: owner.ownerName,
+                    phone: owner.phone,
                 });
+
+                if (result.success) {
+                    toast({
+                        title: "🎉 Booking Successful!",
+                        description: `Your ${listingType === "room" ? "room booking" : "mess subscription"} is confirmed. Payment ID: ${result.paymentId}`,
+                    });
+
+                    // Store inquiry
+                    storeInquiry({
+                        listingId,
+                        listingName,
+                        listingType,
+                        userName: paymentFormData.userName,
+                        userPhone: paymentFormData.userPhone,
+                        userEmail: paymentFormData.userEmail,
+                        message: paymentFormData.message,
+                        inquiryType: listingType === "room" ? "booking" : "subscription",
+                        moveInDate: paymentFormData.moveInDate,
+                        stayDuration: paymentFormData.stayDuration,
+                        mealPlan: paymentFormData.mealPlan,
+                        subscriptionDuration: paymentFormData.subscriptionDuration,
+                    });
+                }
+            } catch (error: any) {
+                if (error.message !== "Payment cancelled by user") {
+                    toast({
+                        title: "Payment Failed",
+                        description: error.message || "Something went wrong. Please try again.",
+                        variant: "destructive",
+                    });
+                }
+            } finally {
+                setIsProcessing(false);
             }
-        } finally {
-            setIsProcessing(false);
-        }
+        }, 300); // Wait for modal close animation
     };
 
     if (!owner) return null;
@@ -336,8 +345,8 @@ const ContactOwnerModal = ({
                     <button
                         onClick={() => setActiveTab("book")}
                         className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-all ${activeTab === "book"
-                                ? "bg-indigo-600 text-white"
-                                : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
+                            ? "bg-indigo-600 text-white"
+                            : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
                             }`}
                     >
                         <CreditCard className="w-4 h-4 inline mr-2" />
@@ -346,8 +355,8 @@ const ContactOwnerModal = ({
                     <button
                         onClick={() => setActiveTab("contact")}
                         className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-all ${activeTab === "contact"
-                                ? "bg-indigo-600 text-white"
-                                : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
+                            ? "bg-indigo-600 text-white"
+                            : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
                             }`}
                     >
                         <MessageCircle className="w-4 h-4 inline mr-2" />
