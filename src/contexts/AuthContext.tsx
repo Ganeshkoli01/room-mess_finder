@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
+import { isAdminEmail } from "@/config/adminConfig";
 
 type UserRole = "user" | "owner" | "admin";
 
@@ -9,6 +10,7 @@ interface AuthContextType {
   session: Session | null;
   loading: boolean;
   userRole: UserRole | null;
+  isAdmin: boolean;
   signUp: (email: string, password: string, metadata: { first_name: string; last_name: string; role: string }) => Promise<{ error: Error | null }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signInWithGoogle: () => Promise<{ error: Error | null }>;
@@ -25,7 +27,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [userRole, setUserRole] = useState<UserRole | null>(null);
 
-  const fetchUserRole = async (userId: string) => {
+  // Check if current user is a predefined admin
+  const isAdmin = user?.email ? isAdminEmail(user.email) : false;
+
+  const fetchUserRole = async (userId: string, email: string | undefined) => {
+    // If user email is in admin list, set role to admin
+    if (email && isAdminEmail(email)) {
+      console.log('👑 Admin user detected:', email);
+      setUserRole('admin');
+      return;
+    }
+
     setTimeout(async () => {
       try {
         const { data, error } = await supabase
@@ -52,7 +64,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setLoading(false);
 
         if (session?.user) {
-          fetchUserRole(session.user.id);
+          fetchUserRole(session.user.id, session.user.email);
         } else {
           setUserRole(null);
         }
@@ -66,7 +78,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setLoading(false);
 
       if (session?.user) {
-        fetchUserRole(session.user.id);
+        fetchUserRole(session.user.id, session.user.email);
       }
     });
 
@@ -149,7 +161,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, userRole, signUp, signIn, signInWithGoogle, signOut, resetPassword, updatePassword }}>
+    <AuthContext.Provider value={{ user, session, loading, userRole, isAdmin, signUp, signIn, signInWithGoogle, signOut, resetPassword, updatePassword }}>
       {children}
     </AuthContext.Provider>
   );

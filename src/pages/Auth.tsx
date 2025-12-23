@@ -21,6 +21,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
+import { isAdminEmail } from "@/config/adminConfig";
 import { z } from "zod";
 
 const signUpSchema = z.object({
@@ -94,6 +95,17 @@ const Auth = () => {
           navigate("/");
         }
       } else {
+        // Check if trying to sign up with an admin email
+        if (isAdminEmail(formData.email)) {
+          toast({
+            title: "Admin Account",
+            description: "This email is reserved for administrators. Please login instead.",
+            variant: "destructive"
+          });
+          setLoading(false);
+          return;
+        }
+
         const result = signUpSchema.safeParse(formData);
         if (!result.success) {
           const fieldErrors: Record<string, string> = {};
