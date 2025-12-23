@@ -1,0 +1,25 @@
+# Room & Mess Finder - robots.txt
+# https://roomandmess.com/robots.txt
+
+User-agent: *
+Allow: /
+Disallow: /dashboard
+Disallow: /owner/dashboard
+Disallow: /admin/dashboard
+Disallow: /owner-dashboard
+
+# Crawlers
+User-agent: Googlebot
+Allow: /
+
+User-agent: Bingbot
+Allow: /
+
+User-agent: Twitterbot
+Allow: /
+
+User-agent: facebookexternalhit
+Allow: /
+
+# Sitemap
+Sitemap: https://roomandmess.com/sitemap.xml
