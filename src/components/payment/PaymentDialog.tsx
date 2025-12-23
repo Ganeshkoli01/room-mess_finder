@@ -102,62 +102,73 @@ const PaymentDialog = ({
             return;
         }
 
-        setIsProcessing(true);
+        const paymentDetails: PaymentDetails = {
+            amount: planDetails[selectedPlan].price,
+            currency: "INR",
+            orderId: generateOrderId(),
+            listingId,
+            listingType,
+            listingTitle,
+            planType: selectedPlan,
+            userId: user.id,
+            userEmail: user.email || "",
+            userName: user.user_metadata?.first_name || "User",
+        };
 
-        try {
-            const paymentDetails: PaymentDetails = {
-                amount: planDetails[selectedPlan].price,
-                currency: "INR",
-                orderId: generateOrderId(),
-                listingId,
-                listingType,
-                listingTitle,
-                planType: selectedPlan,
-                userId: user.id,
-                userEmail: user.email || "",
-                userName: user.user_metadata?.first_name || "User",
-            };
+        // Close dialog before opening Razorpay to prevent z-index issues
+        setOpen(false);
 
-            const result = await initiatePayment(paymentDetails);
+        // Wait for dialog to close before opening Razorpay
+        setTimeout(async () => {
+            setIsProcessing(true);
 
-            if (result.success) {
-                setPaymentSuccess(true);
-                setReceipt({
-                    id: result.orderId,
-                    transactionId: result.transactionId,
-                    orderId: result.orderId,
-                    amount: result.amount,
-                    currency: "INR",
-                    listingTitle,
-                    listingType,
-                    planType: selectedPlan,
-                    userName: paymentDetails.userName,
-                    userEmail: paymentDetails.userEmail,
-                    timestamp: result.timestamp,
-                    status: "success",
-                });
+            try {
+                const result = await initiatePayment(paymentDetails);
 
-                // Add notification
-                addNotification(
-                    notificationTemplates.paymentSuccess(result.amount, listingTitle)
-                );
+                if (result.success) {
+                    // Reopen dialog to show success
+                    setOpen(true);
+                    setPaymentSuccess(true);
+                    setReceipt({
+                        id: result.orderId,
+                        transactionId: result.transactionId,
+                        orderId: result.orderId,
+                        amount: result.amount,
+                        currency: "INR",
+                        listingTitle,
+                        listingType,
+                        planType: selectedPlan,
+                        userName: paymentDetails.userName,
+                        userEmail: paymentDetails.userEmail,
+                        timestamp: result.timestamp,
+                        status: "success",
+                    });
 
+                    // Add notification
+                    addNotification(
+                        notificationTemplates.paymentSuccess(result.amount, listingTitle)
+                    );
+
+                    toast({
+                        title: "Payment Successful! 🎉",
+                        description: `Your ${selectedPlan} plan for ${listingTitle} is now active.`,
+                    });
+                }
+            } catch (error: any) {
                 toast({
-                    title: "Payment Successful! 🎉",
-                    description: `Your ${selectedPlan} plan for ${listingTitle} is now active.`,
+                    title: "Payment Failed",
+                    description: error.message || "Something went wrong. Please try again.",
+                    variant: "destructive",
                 });
-            }
-        } catch (error: any) {
-            toast({
-                title: "Payment Failed",
-                description: error.message || "Something went wrong. Please try again.",
-                variant: "destructive",
-            });
 
-            addNotification(notificationTemplates.paymentFailed(listingTitle));
-        } finally {
-            setIsProcessing(false);
-        }
+                addNotification(notificationTemplates.paymentFailed(listingTitle));
+
+                // Reopen dialog on failure so user can try again
+                setOpen(true);
+            } finally {
+                setIsProcessing(false);
+            }
+        }, 300); // Wait for dialog close animation
     };
 
     const handleDownloadReceipt = () => {

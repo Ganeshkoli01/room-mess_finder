@@ -113,44 +113,58 @@ const BookingDialog = ({
         }
     };
 
+    // Store payment details before closing dialog
+    const [pendingPayment, setPendingPayment] = useState<PaymentDetails | null>(null);
+
     const handlePayment = async () => {
         if (!user) return;
 
-        setLoading(true);
+        const paymentDetails: PaymentDetails = {
+            amount: grandTotal,
+            currency: "INR",
+            orderId: generateOrderId(),
+            listingId: enquiry.listingId,
+            listingType: enquiry.listingType,
+            listingTitle: enquiry.listingTitle,
+            planType: "monthly",
+            userId: user.id,
+            userEmail: user.email || enquiry.userEmail,
+            userName: enquiry.userName,
+        };
 
-        try {
-            const paymentDetails: PaymentDetails = {
-                amount: grandTotal,
-                currency: "INR",
-                orderId: generateOrderId(),
-                listingId: enquiry.listingId,
-                listingType: enquiry.listingType,
-                listingTitle: enquiry.listingTitle,
-                planType: "monthly",
-                userId: user.id,
-                userEmail: user.email || enquiry.userEmail,
-                userName: enquiry.userName,
-            };
+        // Save payment details and close dialog to prevent z-index issues with Razorpay
+        setPendingPayment(paymentDetails);
+        setOpen(false);
 
-            const result = await initiatePayment(paymentDetails);
+        // Wait for dialog to close before opening Razorpay
+        setTimeout(async () => {
+            setLoading(true);
+            try {
+                const result = await initiatePayment(paymentDetails);
 
-            if (result.success) {
-                setStep("success");
+                if (result.success) {
+                    // Reopen dialog to show success
+                    setOpen(true);
+                    setStep("success");
+                    toast({
+                        title: "Booking Confirmed! 🎉",
+                        description: `Your room at ${enquiry.listingTitle} is booked.`,
+                    });
+                    onSuccess?.();
+                }
+            } catch (error: any) {
                 toast({
-                    title: "Booking Confirmed! 🎉",
-                    description: `Your room at ${enquiry.listingTitle} is booked.`,
+                    title: "Payment Failed",
+                    description: error.message,
+                    variant: "destructive",
                 });
-                onSuccess?.();
+                // Reopen dialog on failure so user can try again
+                setOpen(true);
+            } finally {
+                setLoading(false);
+                setPendingPayment(null);
             }
-        } catch (error: any) {
-            toast({
-                title: "Payment Failed",
-                description: error.message,
-                variant: "destructive",
-            });
-        } finally {
-            setLoading(false);
-        }
+        }, 300); // Wait for dialog close animation
     };
 
     const handleClose = () => {
