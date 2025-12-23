@@ -30,6 +30,7 @@ import {
   Save
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { isAdminEmail, ADMIN_EMAILS } from "@/config/adminConfig";
 
 interface RoomListing {
   id: string;
@@ -217,70 +218,86 @@ const AdminDashboard = () => {
     }
   };
 
-  // Fetch all users (profiles + user_roles)
+  // Fetch all users (profiles + user_roles + admin detection from config)
   const fetchAllUsers = async () => {
     setLoadingUsers(true);
     try {
-      // Get all user roles first
-      const { data: rolesData, error: rolesError } = await supabase
-        .from("user_roles")
-        .select("user_id, role, created_at")
-        .order("created_at", { ascending: false });
+      console.log("🔍 Fetching all users...");
 
-      if (rolesError) {
-        console.error("Error fetching roles:", rolesError);
-      }
-
-      // Get all profiles
+      // Get all profiles first - this is the primary source of users
       const { data: profilesData, error: profilesError } = await supabase
         .from("profiles")
-        .select("user_id, first_name, last_name, phone, created_at");
+        .select("user_id, first_name, last_name, phone, created_at")
+        .order("created_at", { ascending: false });
+
+      console.log("👤 Profiles data:", profilesData);
+      console.log("👤 Profiles count:", profilesData?.length || 0);
 
       if (profilesError) {
-        console.error("Error fetching profiles:", profilesError);
+        console.error("❌ Error fetching profiles:", profilesError);
       }
 
-      // Combine data - start with profiles and add roles
-      const usersMap = new Map<string, UserItem>();
+      // Get user roles - may be limited by RLS
+      const { data: rolesData, error: rolesError } = await supabase
+        .from("user_roles")
+        .select("user_id, role, created_at");
 
-      // Add users from profiles
-      (profilesData || []).forEach(profile => {
-        if (profile.user_id) {
-          usersMap.set(profile.user_id, {
-            id: profile.user_id,
-            email: profile.phone || profile.user_id?.substring(0, 8) + "...",
-            full_name: `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || "User",
-            role: "user",
-            created_at: profile.created_at,
-          });
+      console.log("📋 Roles data:", rolesData);
+      console.log("📋 Roles count:", rolesData?.length || 0);
+
+      if (rolesError) {
+        console.error("❌ Error fetching roles:", rolesError);
+      }
+
+      // Create a map of user_id to role from the database
+      const roleMap = new Map<string, string>();
+      (rolesData || []).forEach(r => {
+        if (r.user_id) {
+          roleMap.set(r.user_id, r.role);
         }
       });
 
-      // Add/update users from roles (this ensures users with roles but no profile are included)
-      (rolesData || []).forEach(roleEntry => {
-        if (roleEntry.user_id) {
-          const existingUser = usersMap.get(roleEntry.user_id);
-          if (existingUser) {
-            // Update role for existing user
-            existingUser.role = roleEntry.role;
-          } else {
-            // Add user that has role but no profile
-            usersMap.set(roleEntry.user_id, {
-              id: roleEntry.user_id,
-              email: roleEntry.user_id?.substring(0, 12) + "...",
-              full_name: "User (No Profile)",
-              role: roleEntry.role,
-              created_at: roleEntry.created_at,
-            });
-          }
+      // Build users list from profiles
+      const usersWithRoles: UserItem[] = (profilesData || []).map((profile: any) => {
+        const userId = profile.user_id;
+        // Phone might contain email for some profiles
+        const phoneOrEmail = profile.phone || "";
+
+        // Determine role with priority:
+        // 1. Check if phone (which might be email) is in predefined admin list
+        // 2. Check database role
+        // 3. Default to "user"
+        let role = "user";
+
+        // Check if this user is a predefined admin (by checking phone field which may contain email)
+        if (phoneOrEmail && isAdminEmail(phoneOrEmail)) {
+          role = "admin";
+          console.log(`👑 Admin detected from config: ${phoneOrEmail}`);
+        } else if (userId && roleMap.has(userId)) {
+          // Get role from database
+          role = roleMap.get(userId) || "user";
+          console.log(`📋 Role from database for ${profile.first_name}: ${role}`);
         }
+
+        return {
+          id: userId || "",
+          email: phoneOrEmail || userId?.substring(0, 8) + "...",
+          full_name: `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || "User",
+          role: role,
+          created_at: profile.created_at,
+        };
       });
 
-      // Convert map to array and sort by role priority (admin first, then owner, then user)
-      const usersWithRoles = Array.from(usersMap.values()).sort((a, b) => {
+      // Sort by role priority (admin first, then owner, then user)
+      usersWithRoles.sort((a, b) => {
         const rolePriority: Record<string, number> = { admin: 0, owner: 1, user: 2 };
         return (rolePriority[a.role] ?? 2) - (rolePriority[b.role] ?? 2);
       });
+
+      console.log("👥 Final users list:", usersWithRoles);
+      console.log("👑 Admins count:", usersWithRoles.filter(u => u.role === "admin").length);
+      console.log("🏠 Owners count:", usersWithRoles.filter(u => u.role === "owner").length);
+      console.log("👤 Users count:", usersWithRoles.filter(u => u.role === "user").length);
 
       setAllUsers(usersWithRoles);
       setStats(prev => ({
@@ -289,7 +306,7 @@ const AdminDashboard = () => {
         totalOwners: usersWithRoles.filter(u => u.role === "owner").length,
       }));
     } catch (error) {
-      console.error("Error fetching users:", error);
+      console.error("❌ Error fetching users:", error);
     } finally {
       setLoadingUsers(false);
     }
