@@ -471,33 +471,33 @@ const RoomDetail = () => {
                             {/* Room Details */}
                             <div className="bg-card rounded-2xl p-6 shadow-soft">
                                 <h2 className="font-heading font-semibold text-xl mb-4">Room Details</h2>
-                                <div className="grid md:grid-cols-2 gap-6">
-                                    <div className="space-y-4">
-                                        <div className="flex justify-between py-2 border-b">
-                                            <span className="text-muted-foreground">Room Type</span>
-                                            <span className="font-medium">{displayRoom.room_type || "Single"}</span>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+                                    <div className="space-y-3">
+                                        <div className="flex flex-col sm:flex-row sm:justify-between py-2 border-b gap-1">
+                                            <span className="text-muted-foreground text-sm">Room Type</span>
+                                            <span className="font-medium text-right">{displayRoom.room_type || "Single"}</span>
                                         </div>
-                                        <div className="flex justify-between py-2 border-b">
-                                            <span className="text-muted-foreground">Available From</span>
-                                            <span className="font-medium">{demoRoomDetails.available_from}</span>
+                                        <div className="flex flex-col sm:flex-row sm:justify-between py-2 border-b gap-1">
+                                            <span className="text-muted-foreground text-sm">Available From</span>
+                                            <span className="font-medium text-right">{demoRoomDetails.available_from}</span>
                                         </div>
-                                        <div className="flex justify-between py-2 border-b">
-                                            <span className="text-muted-foreground">Security Deposit</span>
-                                            <span className="font-medium">₹{demoRoomDetails.deposit.toLocaleString()}</span>
+                                        <div className="flex flex-col sm:flex-row sm:justify-between py-2 border-b gap-1">
+                                            <span className="text-muted-foreground text-sm">Security Deposit</span>
+                                            <span className="font-medium text-right">₹{demoRoomDetails.deposit.toLocaleString()}</span>
                                         </div>
                                     </div>
-                                    <div className="space-y-4">
-                                        <div className="flex justify-between py-2 border-b">
-                                            <span className="text-muted-foreground">Preferred Tenants</span>
-                                            <span className="font-medium">{demoRoomDetails.preferred_tenants}</span>
+                                    <div className="space-y-3">
+                                        <div className="flex flex-col sm:flex-row sm:justify-between py-2 border-b gap-1">
+                                            <span className="text-muted-foreground text-sm">Preferred Tenants</span>
+                                            <span className="font-medium text-right">{demoRoomDetails.preferred_tenants}</span>
                                         </div>
-                                        <div className="flex justify-between py-2 border-b">
-                                            <span className="text-muted-foreground">Furnishing</span>
-                                            <span className="font-medium">Fully Furnished</span>
+                                        <div className="flex flex-col sm:flex-row sm:justify-between py-2 border-b gap-1">
+                                            <span className="text-muted-foreground text-sm">Furnishing</span>
+                                            <span className="font-medium text-right">Fully Furnished</span>
                                         </div>
-                                        <div className="flex justify-between py-2 border-b">
-                                            <span className="text-muted-foreground">Floor</span>
-                                            <span className="font-medium">2nd Floor</span>
+                                        <div className="flex flex-col sm:flex-row sm:justify-between py-2 border-b gap-1">
+                                            <span className="text-muted-foreground text-sm">Floor</span>
+                                            <span className="font-medium text-right">2nd Floor</span>
                                         </div>
                                     </div>
                                 </div>
