@@ -238,9 +238,9 @@ const RoomListings = () => {
   const FilterContent = () => (
     <div className="space-y-6">
       {/* Data Source Toggle */}
-      <div className="animate-in fade-in slide-in-from-left-2 duration-300">
+      <div>
         <h3 className="font-semibold mb-3 flex items-center gap-2">
-          <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+          <span className="w-1.5 h-1.5 rounded-full bg-primary" />
           Data Source
         </h3>
         <div className="space-y-2">
@@ -252,8 +252,8 @@ const RoomListings = () => {
             <label
               key={source.value}
               className={`flex items-center gap-3 p-2.5 rounded-xl cursor-pointer transition-all duration-200 ${dataSource === source.value
-                  ? 'bg-primary/10 border border-primary/20'
-                  : 'hover:bg-muted/50 border border-transparent'
+                ? 'bg-primary/10 border border-primary/20'
+                : 'hover:bg-muted/50 border border-transparent'
                 }`}
               style={{ animationDelay: `${idx * 50}ms` }}
             >
@@ -274,21 +274,20 @@ const RoomListings = () => {
       </div>
 
       {/* Room Type */}
-      <div className="animate-in fade-in slide-in-from-left-2 duration-300" style={{ animationDelay: '100ms' }}>
+      <div>
         <h3 className="font-semibold mb-3 flex items-center gap-2">
-          <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+          <span className="w-1.5 h-1.5 rounded-full bg-primary" />
           Room Type
         </h3>
         <div className="flex flex-wrap gap-2">
-          {roomTypes.map((type, idx) => (
+          {roomTypes.map((type) => (
             <button
               key={type}
               onClick={() => handleRoomTypeChange(type, !selectedRoomTypes.includes(type))}
               className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all duration-200 transform hover:scale-105 active:scale-95 ${selectedRoomTypes.includes(type)
-                  ? 'bg-primary text-primary-foreground shadow-md shadow-primary/25'
-                  : 'bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground'
+                ? 'bg-primary text-primary-foreground shadow-md shadow-primary/25'
+                : 'bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground'
                 }`}
-              style={{ animationDelay: `${100 + idx * 30}ms` }}
             >
               {type}
             </button>
@@ -296,10 +295,10 @@ const RoomListings = () => {
         </div>
       </div>
 
-      {/* Price Range - Enhanced */}
-      <div className="animate-in fade-in slide-in-from-left-2 duration-300" style={{ animationDelay: '200ms' }}>
+      {/* Price Range */}
+      <div>
         <h3 className="font-semibold mb-4 flex items-center gap-2">
-          <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+          <span className="w-1.5 h-1.5 rounded-full bg-primary" />
           Price Range
         </h3>
 
@@ -316,39 +315,23 @@ const RoomListings = () => {
           </div>
         </div>
 
-        {/* Slider */}
+        {/* Slider - Smooth free movement */}
         <div className="px-1">
           <Slider
             value={priceRange}
             onValueChange={setPriceRange}
             min={0}
             max={20000}
-            step={500}
+            step={1}
             className="mb-2"
           />
-        </div>
-
-        {/* Quick Price Buttons */}
-        <div className="flex gap-2 mt-3">
-          {[5000, 10000, 15000, 20000].map((price) => (
-            <button
-              key={price}
-              onClick={() => setPriceRange([0, price])}
-              className={`flex-1 py-1.5 text-xs rounded-lg transition-all duration-200 hover:scale-105 ${priceRange[1] === price
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-muted/50 hover:bg-muted text-muted-foreground'
-                }`}
-            >
-              ≤₹{(price / 1000)}k
-            </button>
-          ))}
         </div>
       </div>
 
       {/* Facilities */}
-      <div className="animate-in fade-in slide-in-from-left-2 duration-300" style={{ animationDelay: '300ms' }}>
+      <div>
         <h3 className="font-semibold mb-3 flex items-center gap-2">
-          <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+          <span className="w-1.5 h-1.5 rounded-full bg-primary" />
           Facilities
         </h3>
         <div className="grid grid-cols-2 gap-2">
@@ -356,8 +339,8 @@ const RoomListings = () => {
             <label
               key={facility}
               className={`flex items-center gap-2 p-2.5 rounded-xl cursor-pointer transition-all duration-200 ${selectedFacilities.includes(facility.toLowerCase())
-                  ? 'bg-primary/10 border border-primary/20'
-                  : 'bg-muted/30 hover:bg-muted/50 border border-transparent'
+                ? 'bg-primary/10 border border-primary/20'
+                : 'bg-muted/30 hover:bg-muted/50 border border-transparent'
                 }`}
             >
               <Checkbox
@@ -378,15 +361,15 @@ const RoomListings = () => {
       </div>
 
       {/* Verification */}
-      <div className="animate-in fade-in slide-in-from-left-2 duration-300" style={{ animationDelay: '400ms' }}>
+      <div>
         <h3 className="font-semibold mb-3 flex items-center gap-2">
-          <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+          <span className="w-1.5 h-1.5 rounded-full bg-primary" />
           Verification
         </h3>
         <label
           className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all duration-200 ${verifiedOnly
-              ? 'bg-green-500/10 border border-green-500/20'
-              : 'bg-muted/30 hover:bg-muted/50 border border-transparent'
+            ? 'bg-green-500/10 border border-green-500/20'
+            : 'bg-muted/30 hover:bg-muted/50 border border-transparent'
             }`}
         >
           <Checkbox
@@ -478,16 +461,18 @@ const RoomListings = () => {
           </div>
 
           <div className="flex gap-8">
-            {/* Filters Sidebar - Desktop */}
+            {/* Filters Sidebar - Desktop with independent scroll */}
             <aside className="hidden lg:block w-72 flex-shrink-0">
-              <div className="bg-card rounded-2xl p-6 shadow-soft sticky top-24">
-                <div className="flex items-center justify-between mb-6">
+              <div className="bg-card rounded-2xl shadow-soft sticky top-24 max-h-[calc(100vh-120px)] flex flex-col">
+                <div className="flex items-center justify-between p-6 pb-4 border-b">
                   <h2 className="font-heading font-semibold text-lg">Filters</h2>
                   <Button variant="ghost" size="sm" className="text-primary" onClick={clearFilters}>
                     Clear All
                   </Button>
                 </div>
-                <FilterContent />
+                <div className="overflow-y-auto p-6 pt-4 flex-1 scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent hover:scrollbar-thumb-muted-foreground/30">
+                  <FilterContent />
+                </div>
               </div>
             </aside>
 
