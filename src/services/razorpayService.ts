@@ -80,16 +80,31 @@ export interface PaymentReceipt {
 }
 
 // Configuration - Read from environment or use test keys
-const getConfig = (): PaymentConfig => ({
-  keyId: import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_your_key_here',
-  keySecret: import.meta.env.VITE_RAZORPAY_KEY_SECRET,
-  currency: 'INR',
-  companyName: 'Room & Mess Finder',
-  companyLogo: '/logo.png',
-  theme: {
-    color: '#6366f1', // Indigo color matching the app theme
-  },
-});
+// For Vercel: Make sure to add VITE_RAZORPAY_KEY_ID in Vercel Environment Variables
+const getConfig = (): PaymentConfig => {
+  // Try to get from environment variable first
+  let keyId = import.meta.env.VITE_RAZORPAY_KEY_ID;
+
+  // Fallback to test key if not configured (for demo purposes)
+  // In production, always use environment variables
+  if (!keyId || keyId === 'rzp_test_your_key_here' || keyId === 'your_razorpay_key_id') {
+    console.log('⚠️ Using fallback Razorpay test key. Set VITE_RAZORPAY_KEY_ID for production.');
+    keyId = 'rzp_test_RuzXz41lGg4UEu'; // Test key fallback
+  }
+
+  console.log('🔑 Razorpay Key ID configured:', keyId.substring(0, 15) + '...');
+
+  return {
+    keyId,
+    keySecret: import.meta.env.VITE_RAZORPAY_KEY_SECRET,
+    currency: 'INR',
+    companyName: 'Room & Mess Finder',
+    companyLogo: '/logo.png',
+    theme: {
+      color: '#6366f1', // Indigo color matching the app theme
+    },
+  };
+};
 
 // Load Razorpay script dynamically
 export const loadRazorpayScript = (): Promise<boolean> => {
