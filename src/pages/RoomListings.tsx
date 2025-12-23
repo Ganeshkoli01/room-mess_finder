@@ -236,119 +236,174 @@ const RoomListings = () => {
   const googleCount = googleRooms.length;
 
   const FilterContent = () => (
-    <>
+    <div className="space-y-6">
       {/* Data Source Toggle */}
-      <div className="mb-6">
-        <h3 className="font-semibold mb-3">Data Source</h3>
+      <div className="animate-in fade-in slide-in-from-left-2 duration-300">
+        <h3 className="font-semibold mb-3 flex items-center gap-2">
+          <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+          Data Source
+        </h3>
         <div className="space-y-2">
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="radio"
-              name="dataSource"
-              checked={dataSource === "all"}
-              onChange={() => setDataSource("all")}
-              className="w-4 h-4 text-primary"
-            />
-            <span className="text-sm">All Sources</span>
-          </label>
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="radio"
-              name="dataSource"
-              checked={dataSource === "database"}
-              onChange={() => setDataSource("database")}
-              className="w-4 h-4 text-primary"
-            />
-            <span className="text-sm flex items-center gap-1">
-              <Database className="w-3 h-3" />
-              Our Listings ({dbCount})
-            </span>
-          </label>
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="radio"
-              name="dataSource"
-              checked={dataSource === "google"}
-              onChange={() => setDataSource("google")}
-              className="w-4 h-4 text-primary"
-            />
-            <span className="text-sm flex items-center gap-1">
-              <MapPinned className="w-3 h-3" />
-              OpenStreetMap ({googleCount})
-            </span>
-          </label>
-        </div>
-      </div>
-
-      {/* Room Type */}
-      <div className="mb-6">
-        <h3 className="font-semibold mb-3">Room Type</h3>
-        <div className="space-y-3">
-          {roomTypes.map((type) => (
-            <div key={type} className="flex items-center gap-2">
-              <Checkbox
-                id={`room-${type.toLowerCase()}`}
-                checked={selectedRoomTypes.includes(type)}
-                onCheckedChange={(checked) => handleRoomTypeChange(type, checked as boolean)}
+          {[
+            { value: "all", label: "All Sources", icon: null },
+            { value: "database", label: `Our Listings (${dbCount})`, icon: <Database className="w-3 h-3" /> },
+            { value: "google", label: `OpenStreetMap (${googleCount})`, icon: <MapPinned className="w-3 h-3" /> }
+          ].map((source, idx) => (
+            <label
+              key={source.value}
+              className={`flex items-center gap-3 p-2.5 rounded-xl cursor-pointer transition-all duration-200 ${dataSource === source.value
+                  ? 'bg-primary/10 border border-primary/20'
+                  : 'hover:bg-muted/50 border border-transparent'
+                }`}
+              style={{ animationDelay: `${idx * 50}ms` }}
+            >
+              <input
+                type="radio"
+                name="dataSource"
+                checked={dataSource === source.value}
+                onChange={() => setDataSource(source.value as any)}
+                className="w-4 h-4 text-primary accent-primary"
               />
-              <Label htmlFor={`room-${type.toLowerCase()}`} className="text-sm cursor-pointer">
-                {type}
-              </Label>
-            </div>
+              <span className="text-sm flex items-center gap-1.5 font-medium">
+                {source.icon}
+                {source.label}
+              </span>
+            </label>
           ))}
         </div>
       </div>
 
-      {/* Price Range */}
-      <div className="mb-6">
-        <h3 className="font-semibold mb-3">Price Range</h3>
-        <Slider
-          value={priceRange}
-          onValueChange={setPriceRange}
-          max={20000}
-          step={500}
-          className="mb-3"
-        />
-        <div className="flex items-center justify-between text-sm text-muted-foreground">
-          <span>₹{priceRange[0].toLocaleString()}</span>
-          <span>₹{priceRange[1].toLocaleString()}</span>
+      {/* Room Type */}
+      <div className="animate-in fade-in slide-in-from-left-2 duration-300" style={{ animationDelay: '100ms' }}>
+        <h3 className="font-semibold mb-3 flex items-center gap-2">
+          <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+          Room Type
+        </h3>
+        <div className="flex flex-wrap gap-2">
+          {roomTypes.map((type, idx) => (
+            <button
+              key={type}
+              onClick={() => handleRoomTypeChange(type, !selectedRoomTypes.includes(type))}
+              className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all duration-200 transform hover:scale-105 active:scale-95 ${selectedRoomTypes.includes(type)
+                  ? 'bg-primary text-primary-foreground shadow-md shadow-primary/25'
+                  : 'bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground'
+                }`}
+              style={{ animationDelay: `${100 + idx * 30}ms` }}
+            >
+              {type}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Price Range - Enhanced */}
+      <div className="animate-in fade-in slide-in-from-left-2 duration-300" style={{ animationDelay: '200ms' }}>
+        <h3 className="font-semibold mb-4 flex items-center gap-2">
+          <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+          Price Range
+        </h3>
+
+        {/* Price Display Cards */}
+        <div className="flex items-center gap-3 mb-4">
+          <div className="flex-1 bg-gradient-to-br from-primary/5 to-primary/10 rounded-xl p-3 border border-primary/10">
+            <span className="text-xs text-muted-foreground block mb-0.5">Min</span>
+            <span className="text-lg font-bold text-primary">₹{priceRange[0].toLocaleString()}</span>
+          </div>
+          <div className="text-muted-foreground">—</div>
+          <div className="flex-1 bg-gradient-to-br from-primary/5 to-primary/10 rounded-xl p-3 border border-primary/10">
+            <span className="text-xs text-muted-foreground block mb-0.5">Max</span>
+            <span className="text-lg font-bold text-primary">₹{priceRange[1].toLocaleString()}</span>
+          </div>
+        </div>
+
+        {/* Slider */}
+        <div className="px-1">
+          <Slider
+            value={priceRange}
+            onValueChange={setPriceRange}
+            min={0}
+            max={20000}
+            step={500}
+            className="mb-2"
+          />
+        </div>
+
+        {/* Quick Price Buttons */}
+        <div className="flex gap-2 mt-3">
+          {[5000, 10000, 15000, 20000].map((price) => (
+            <button
+              key={price}
+              onClick={() => setPriceRange([0, price])}
+              className={`flex-1 py-1.5 text-xs rounded-lg transition-all duration-200 hover:scale-105 ${priceRange[1] === price
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-muted/50 hover:bg-muted text-muted-foreground'
+                }`}
+            >
+              ≤₹{(price / 1000)}k
+            </button>
+          ))}
         </div>
       </div>
 
       {/* Facilities */}
-      <div className="mb-6">
-        <h3 className="font-semibold mb-3">Facilities</h3>
-        <div className="space-y-3">
-          {facilitiesList.map((facility) => (
-            <div key={facility} className="flex items-center gap-2">
+      <div className="animate-in fade-in slide-in-from-left-2 duration-300" style={{ animationDelay: '300ms' }}>
+        <h3 className="font-semibold mb-3 flex items-center gap-2">
+          <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+          Facilities
+        </h3>
+        <div className="grid grid-cols-2 gap-2">
+          {facilitiesList.map((facility, idx) => (
+            <label
+              key={facility}
+              className={`flex items-center gap-2 p-2.5 rounded-xl cursor-pointer transition-all duration-200 ${selectedFacilities.includes(facility.toLowerCase())
+                  ? 'bg-primary/10 border border-primary/20'
+                  : 'bg-muted/30 hover:bg-muted/50 border border-transparent'
+                }`}
+            >
               <Checkbox
                 id={`facility-${facility.toLowerCase().replace(" ", "-")}`}
                 checked={selectedFacilities.includes(facility.toLowerCase())}
                 onCheckedChange={(checked) => handleFacilityChange(facility, checked as boolean)}
+                className="transition-transform duration-200 data-[state=checked]:scale-110"
               />
-              <Label htmlFor={`facility-${facility.toLowerCase().replace(" ", "-")}`} className="text-sm cursor-pointer">
+              <Label
+                htmlFor={`facility-${facility.toLowerCase().replace(" ", "-")}`}
+                className="text-sm cursor-pointer font-medium"
+              >
                 {facility}
               </Label>
-            </div>
+            </label>
           ))}
         </div>
       </div>
 
       {/* Verification */}
-      <div>
-        <h3 className="font-semibold mb-3">Verification</h3>
-        <div className="flex items-center gap-2">
+      <div className="animate-in fade-in slide-in-from-left-2 duration-300" style={{ animationDelay: '400ms' }}>
+        <h3 className="font-semibold mb-3 flex items-center gap-2">
+          <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+          Verification
+        </h3>
+        <label
+          className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all duration-200 ${verifiedOnly
+              ? 'bg-green-500/10 border border-green-500/20'
+              : 'bg-muted/30 hover:bg-muted/50 border border-transparent'
+            }`}
+        >
           <Checkbox
             id="verified-only"
             checked={verifiedOnly}
             onCheckedChange={(checked) => setVerifiedOnly(checked as boolean)}
+            className="transition-transform duration-200 data-[state=checked]:scale-110"
           />
-          <Label htmlFor="verified-only" className="text-sm cursor-pointer">
-            Show verified only
-          </Label>
-        </div>
+          <div>
+            <Label htmlFor="verified-only" className="text-sm cursor-pointer font-medium block">
+              Verified Only
+            </Label>
+            <span className="text-xs text-muted-foreground">Show listings with verified contact</span>
+          </div>
+        </label>
       </div>
-    </>
+    </div>
   );
 
   return (
