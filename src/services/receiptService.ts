@@ -299,32 +299,52 @@ export const emailReceipt = async (data: ReceiptData): Promise<boolean> => {
             reader.onloadend = async () => {
                 const base64 = (reader.result as string).split(",")[1];
 
-                // Call edge function to send email
-                const response = await fetch("/api/send-receipt-email", {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify({
-                        to: data.userEmail,
-                        userName: data.userName,
-                        paymentId: data.paymentId,
-                        amount: data.amount,
-                        listingName: data.listingName,
-                        listingType: data.listingType,
-                        pdfBase64: base64,
-                    }),
-                });
+                // Call Supabase edge function to send email
+                const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+                const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-                if (response.ok) {
-                    resolve(true);
-                } else {
-                    // Fallback: just return true since we've shown the download option
-                    console.log("Email API not available, receipt can be downloaded");
-                    resolve(true);
+                if (!supabaseUrl || !supabaseAnonKey) {
+                    console.log("Supabase not configured, email cannot be sent");
+                    resolve(true); // Still resolve so user can download
+                    return;
+                }
+
+                try {
+                    const response = await fetch(`${supabaseUrl}/functions/v1/send-receipt-email`, {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                            "Authorization": `Bearer ${supabaseAnonKey}`,
+                        },
+                        body: JSON.stringify({
+                            to: data.userEmail,
+                            userName: data.userName,
+                            paymentId: data.paymentId,
+                            amount: data.amount,
+                            listingName: data.listingName,
+                            listingType: data.listingType,
+                            pdfBase64: base64,
+                        }),
+                    });
+
+                    const result = await response.json();
+
+                    if (response.ok && result.success) {
+                        console.log("Email sent successfully");
+                        resolve(true);
+                    } else {
+                        console.log("Email send failed, but receipt can be downloaded");
+                        resolve(true); // Still resolve so user can download
+                    }
+                } catch (fetchError) {
+                    console.error("Error calling edge function:", fetchError);
+                    resolve(true); // Still resolve so user can download
                 }
             };
-            reader.onerror = reject;
+            reader.onerror = () => {
+                console.error("Error reading PDF blob");
+                resolve(true); // Still resolve so user can download
+            };
             reader.readAsDataURL(blob);
         });
     } catch (error) {
