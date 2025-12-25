@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Offline - Room & Mess Finder</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 24px;
+            padding: 48px 32px;
+            max-width: 500px;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        .icon {
+            width: 120px;
+            height: 120px;
+            margin: 0 auto 24px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-center;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                transform: scale(1);
+            }
+
+            50% {
+                transform: scale(1.05);
+            }
+        }
+
+        .icon svg {
+            width: 60px;
+            height: 60px;
+            stroke: white;
+            fill: none;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        h1 {
+            font-size: 28px;
+            font-weight: 700;
+            color: #1f2937;
+            margin-bottom: 12px;
+        }
+
+        p {
+            font-size: 16px;
+            color: #6b7280;
+            line-height: 1.6;
+            margin-bottom: 32px;
+        }
+
+        .button {
+            display: inline-block;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 14px 32px;
+            border-radius: 12px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 16px;
+            transition: transform 0.2s, box-shadow 0.2s;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+        }
+
+        .features {
+            margin-top: 32px;
+            padding-top: 32px;
+            border-top: 1px solid #e5e7eb;
+        }
+
+        .feature {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 16px;
+            text-align: left;
+        }
+
+        .feature-icon {
+            width: 40px;
+            height: 40px;
+            background: #f3f4f6;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-center;
+            flex-shrink: 0;
+        }
+
+        .feature-icon svg {
+            width: 20px;
+            height: 20px;
+            stroke: #667eea;
+        }
+
+        .feature-text {
+            flex: 1;
+        }
+
+        .feature-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #1f2937;
+            margin-bottom: 2px;
+        }
+
+        .feature-desc {
+            font-size: 12px;
+            color: #9ca3af;
+        }
+
+        @media (max-width: 640px) {
+            .container {
+                padding: 32px 24px;
+            }
+
+            h1 {
+                font-size: 24px;
+            }
+
+            p {
+                font-size: 14px;
+            }
+
+            .icon {
+                width: 100px;
+                height: 100px;
+            }
+
+            .icon svg {
+                width: 50px;
+                height: 50px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="icon">
+            <svg viewBox="0 0 24 24">
+                <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+                <path d="M2 17l10 5 10-5M2 12l10 5 10-5"></path>
+            </svg>
+        </div>
+
+        <h1>You're Offline</h1>
+        <p>
+            It looks like you've lost your internet connection. Don't worry, you can still browse your saved favorites
+            and recent searches!
+        </p>
+
+        <a href="/" class="button" onclick="window.location.reload(); return false;">
+            Try Again
+        </a>
+
+        <div class="features">
+            <div class="feature">
+                <div class="feature-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
+                    </svg>
+                </div>
+                <div class="feature-text">
+                    <div class="feature-title">Saved Favorites</div>
+                    <div class="feature-desc">Access your bookmarked listings offline</div>
+                </div>
+            </div>
+
+            <div class="feature">
+                <div class="feature-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <path d="m21 21-4.35-4.35"></path>
+                    </svg>
+                </div>
+                <div class="feature-text">
+                    <div class="feature-title">Recent Searches</div>
+                    <div class="feature-desc">View your search history</div>
+                </div>
+            </div>
+
+            <div class="feature">
+                <div class="feature-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="7 10 12 15 17 10"></polyline>
+                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                    </svg>
+                </div>
+                <div class="feature-text">
+                    <div class="feature-title">Offline Downloads</div>
+                    <div class="feature-desc">Cached listings available to view</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Auto-retry connection every 5 seconds
+        let retryCount = 0;
+        const maxRetries = 12; // 1 minute total
+
+        function checkConnection() {
+            if (navigator.onLine) {
+                window.location.reload();
+            } else if (retryCount < maxRetries) {
+                retryCount++;
+                setTimeout(checkConnection, 5000);
+            }
+        }
+
+        // Start checking after 5 seconds
+        setTimeout(checkConnection, 5000);
+
+        // Listen for online event
+        window.addEventListener('online', () => {
+            window.location.reload();
+        });
+    </script>
+</body>
+
+</html>
