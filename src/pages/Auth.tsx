@@ -92,7 +92,7 @@ const Auth = () => {
           }
         } else {
           toast({ title: "Welcome back!", description: "You have successfully logged in." });
-          navigate("/");
+          navigate("/dashboard");
         }
       } else {
         // Check if trying to sign up with an admin email

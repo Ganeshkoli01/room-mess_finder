@@ -1,16 +1,19 @@
 import { cn } from "@/lib/utils";
 
-interface SkeletonProps {
+import React from "react";
+
+interface SkeletonProps extends React.HTMLAttributes<HTMLDivElement> {
   className?: string;
 }
 
-const Skeleton = ({ className }: SkeletonProps) => {
+const Skeleton = ({ className, ...props }: SkeletonProps) => {
   return (
     <div
       className={cn(
         "animate-shimmer rounded-lg bg-muted",
         className
       )}
+      {...props}
     />
   );
 };

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { useFeatureFlag } from "@/hooks/useFeatureFlag";
 import { motion, AnimatePresence } from "framer-motion";
 
 interface SmartSearchSuggestion {
@@ -15,12 +16,15 @@ interface SmartSearchSuggestion {
 }
 
 const AISmartSearchBar = () => {
+    const isAiSearchEnabled = useFeatureFlag("ai_search");
     const [query, setQuery] = useState("");
     const [suggestions, setSuggestions] = useState<SmartSearchSuggestion[]>([]);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [recentSearches, setRecentSearches] = useState<string[]>([]);
     const navigate = useNavigate();
     const { toast } = useToast();
+
+    if (!isAiSearchEnabled) return null;
 
     // Load recent searches from localStorage
     useEffect(() => {

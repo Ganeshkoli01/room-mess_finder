@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import EnquiryDialog from "@/components/booking/EnquiryDialog";
-import SubscriptionDialog from "@/components/booking/SubscriptionDialog";
+import ContactOwnerModal from "@/components/ContactOwnerModal";
 import ShareButton from "@/components/ShareButton";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -30,6 +30,7 @@ interface MessCardProps {
   menuHighlights: string[];
   isVerified?: boolean;
   ownerId?: string;
+  owner_id?: string;
   distance?: number;
   isFromOSM?: boolean;
 }
@@ -46,11 +47,14 @@ const MessCard = ({
   timings,
   menuHighlights,
   isVerified = false,
-  ownerId = "demo-owner",
+  ownerId,
+  owner_id,
   distance,
   isFromOSM = false,
 }: MessCardProps) => {
+  const finalOwnerId = owner_id || ownerId || "demo-owner";
   const [isFavorite, setIsFavorite] = useState(false);
+  const [showSubscribeModal, setShowSubscribeModal] = useState(false);
   const { toast } = useToast();
   const { t } = useLanguage();
 
@@ -217,12 +221,13 @@ const MessCard = ({
 
         {/* Actions */}
         <div className="flex items-center gap-2 mt-5">
-          <SubscriptionDialog
-            messId={id}
-            messTitle={name}
-            monthlyPrice={pricePerMonth}
-            trigger={<Button variant="default" className="flex-1 gap-1">Subscribe</Button>}
-          />
+          <Button
+            variant="default"
+            className="flex-1 gap-1"
+            onClick={() => setShowSubscribeModal(true)}
+          >
+            Subscribe
+          </Button>
 
           {/* Favorite Button */}
           <Tooltip>
@@ -249,6 +254,24 @@ const MessCard = ({
             url={`${window.location.origin}/mess/${id}`}
           />
         </div>
+
+        {/* Unified Payment & Subscription Modal (Same architecture as /mess/:id) */}
+        <ContactOwnerModal
+          isOpen={showSubscribeModal}
+          onClose={() => setShowSubscribeModal(false)}
+          listingId={id}
+          listingName={name}
+          listingType="mess"
+          price={pricePerMonth}
+          contact={{
+            phone: "919309407387",
+            email: "contact@roomandmess.com",
+            ownerName: name,
+            operatorName: name,
+            hasContact: true,
+          }}
+          ownerId={finalOwnerId}
+        />
       </div>
     </div>
   );

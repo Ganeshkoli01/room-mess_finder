@@ -9,6 +9,13 @@ export interface Profile {
     avatar_url: string | null;
     created_at: string;
     updated_at: string;
+    role?: "user" | "owner" | "admin";
+    status?: "active" | "suspended" | "banned";
+    shadow_banned?: boolean;
+    token_version?: number;
+    is_verified?: boolean;
+    last_login?: string;
+    is_banned?: boolean;
 }
 
 export interface UpdateProfileInput {
@@ -16,6 +23,13 @@ export interface UpdateProfileInput {
     last_name?: string;
     phone?: string;
     avatar_url?: string;
+    role?: "user" | "owner" | "admin";
+    status?: "active" | "suspended" | "banned";
+    shadow_banned?: boolean;
+    token_version?: number;
+    is_verified?: boolean;
+    last_login?: string;
+    is_banned?: boolean;
 }
 
 // Get current user's profile
@@ -28,7 +42,7 @@ export const getProfile = async (): Promise<Profile | null> => {
     }
 
     try {
-        const { data, error } = await supabase
+        const { data, error } = await (supabase as any)
             .from("profiles")
             .select("*")
             .eq("user_id", user.id)
@@ -62,7 +76,7 @@ const createProfileFromUser = async (user: any): Promise<Profile | null> => {
             avatar_url: user.user_metadata?.avatar_url || null,
         };
 
-        const { data, error } = await supabase
+        const { data, error } = await (supabase as any)
             .from("profiles")
             .insert(profileData)
             .select()
@@ -71,7 +85,7 @@ const createProfileFromUser = async (user: any): Promise<Profile | null> => {
         if (error) {
             // If profile already exists (race condition), fetch it
             if (error.code === "23505") {
-                const { data: existingProfile } = await supabase
+                const { data: existingProfile } = await (supabase as any)
                     .from("profiles")
                     .select("*")
                     .eq("user_id", user.id)
@@ -106,7 +120,7 @@ export const updateProfile = async (updates: UpdateProfileInput): Promise<Profil
             await createProfileFromUser(user);
         }
 
-        const { data, error } = await supabase
+        const { data, error } = await (supabase as any)
             .from("profiles")
             .update({
                 ...updates,
@@ -131,7 +145,7 @@ export const updateProfile = async (updates: UpdateProfileInput): Promise<Profil
 // Get profile by user ID (for viewing other users' profiles)
 export const getProfileById = async (userId: string): Promise<Partial<Profile> | null> => {
     try {
-        const { data, error } = await supabase
+        const { data, error } = await (supabase as any)
             .from("profiles")
             .select("first_name, last_name, avatar_url")
             .eq("user_id", userId)
@@ -198,4 +212,74 @@ export const deleteAccount = async (): Promise<void> => {
 
     // Sign out the user
     await supabase.auth.signOut();
+};
+
+// Admin action: get specific user profile
+export const getAdminUserProfile = async (userId: string): Promise<Profile | null> => {
+    try {
+        const { data, error } = await (supabase as any)
+            .from("profiles")
+            .select("*")
+            .eq("user_id", userId)
+            .maybeSingle();
+
+        if (error) throw error;
+        return data;
+    } catch (err) {
+        console.error("Error fetching user profile in admin:", err);
+        return null;
+    }
+};
+
+// Admin action: update profile properties
+export const updateAdminUserProfile = async (userId: string, updates: Partial<Profile>): Promise<boolean> => {
+    try {
+        const { error } = await (supabase as any)
+            .from("profiles")
+            .update(updates)
+            .eq("user_id", userId);
+
+        if (error) throw error;
+        return true;
+    } catch (err) {
+        console.error("Error updating user profile in admin:", err);
+        return false;
+    }
+};
+
+// Admin action: log impersonation event
+export const logImpersonationEvent = async (adminId: string, targetUserId: string): Promise<boolean> => {
+    try {
+        const { error } = await (supabase as any)
+            .from("admin_action_logs")
+            .insert({
+                admin_id: adminId,
+                target_user_id: targetUserId,
+                action_type: "impersonate",
+                timestamp: new Date().toISOString(),
+                details: { info: "Admin impersonated user" }
+            });
+
+        if (error) throw error;
+        return true;
+    } catch (err) {
+        console.error("Error logging impersonation event:", err);
+        return false;
+    }
+};
+
+// Admin action: get impersonation logs
+export const getImpersonationLogs = async (): Promise<any[]> => {
+    try {
+        const { data, error } = await (supabase as any)
+            .from("admin_action_logs")
+            .select("*")
+            .order("timestamp", { ascending: false });
+
+        if (error) throw error;
+        return data || [];
+    } catch (err) {
+        console.error("Error fetching impersonation logs:", err);
+        return [];
+    }
 };

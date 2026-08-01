@@ -33,6 +33,7 @@ import {
 } from "@/services/notificationService";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { checkAndNotifyExpiredSubscriptions } from "@/services/subscriptionExpiryService";
 
 const notificationIcons: Record<NotificationType | "new_enquiry", React.ElementType> = {
     booking_confirmation: Calendar,
@@ -42,6 +43,7 @@ const notificationIcons: Record<NotificationType | "new_enquiry", React.ElementT
     new_listing: Sparkles,
     price_drop: CreditCard,
     enquiry_response: MessageCircle,
+    subscription_expired: AlertCircle,
     system: Bell,
     new_enquiry: Zap,
 };
@@ -54,6 +56,7 @@ const notificationColors: Record<NotificationType | "new_enquiry", string> = {
     new_listing: "text-accent bg-accent/10",
     price_drop: "text-warning bg-warning/10",
     enquiry_response: "text-primary bg-primary/10",
+    subscription_expired: "text-destructive bg-destructive/10 border border-destructive/20",
     system: "text-muted-foreground bg-muted",
     new_enquiry: "text-accent bg-accent/10",
 };
@@ -67,7 +70,14 @@ const NotificationCenter = () => {
 
     // Load notifications
     useEffect(() => {
-        const loadNotifications = () => {
+        const loadNotifications = async () => {
+            if (user?.id) {
+                try {
+                    await checkAndNotifyExpiredSubscriptions(user.id);
+                } catch (e) {
+                    console.error("Error checking expired subscriptions:", e);
+                }
+            }
             setNotifications(getNotifications());
             setUnreadCount(getUnreadCount());
         };
@@ -115,7 +125,7 @@ const NotificationCenter = () => {
                             type: "new_enquiry" as any,
                             title: "🔔 New Enquiry!",
                             message: `${newEnquiry.user_name} is interested in ${newEnquiry.listing_title}`,
-                        });
+                        }, user.id);
 
                         // Refresh notifications
                         setNotifications(getNotifications());
@@ -131,7 +141,7 @@ const NotificationCenter = () => {
                             type: "booking_confirmation",
                             title: "Enquiry Sent!",
                             message: `Your enquiry for ${newEnquiry.listing_title} was sent successfully.`,
-                        });
+                        }, user.id);
                         setNotifications(getNotifications());
                         setUnreadCount(getUnreadCount());
                     }
@@ -168,7 +178,7 @@ const NotificationCenter = () => {
                             type: "status_update",
                             title,
                             message,
-                        });
+                        }, user.id);
 
                         setNotifications(getNotifications());
                         setUnreadCount(getUnreadCount());

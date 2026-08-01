@@ -73,6 +73,7 @@ const PaymentDialog = ({
             price: prices.daily,
             description: "Pay per day",
             duration: "1 day access",
+            badge: undefined as string | undefined,
         },
         weekly: {
             label: "Weekly",
@@ -146,7 +147,8 @@ const PaymentDialog = ({
 
                     // Add notification
                     addNotification(
-                        notificationTemplates.paymentSuccess(result.amount, listingTitle)
+                        notificationTemplates.paymentSuccess(result.amount, listingTitle),
+                        user?.id
                     );
 
                     toast({
@@ -161,7 +163,7 @@ const PaymentDialog = ({
                     variant: "destructive",
                 });
 
-                addNotification(notificationTemplates.paymentFailed(listingTitle));
+                addNotification(notificationTemplates.paymentFailed(listingTitle), user?.id);
 
                 // Reopen dialog on failure so user can try again
                 setOpen(true);

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -41,22 +41,22 @@ const EnquiryDialog = ({ listingId, listingType, listingTitle, ownerId, trigger 
     message: "",
   });
 
+  useEffect(() => {
+    if (user && open) {
+      setFormData((prev) => ({
+        ...prev,
+        name: prev.name || user.user_metadata?.full_name || user.email?.split("@")[0] || "",
+        email: prev.email || user.email || "",
+      }));
+    }
+  }, [user, open]);
+
   const handleChange = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (!user || !session) {
-      toast({
-        title: "Login Required",
-        description: "Please login to send an enquiry",
-        variant: "destructive",
-      });
-      navigate("/auth");
-      return;
-    }
 
     if (!formData.name || !formData.email || !formData.message) {
       toast({
@@ -70,8 +70,9 @@ const EnquiryDialog = ({ listingId, listingType, listingTitle, ownerId, trigger 
     setLoading(true);
 
     try {
+      const activeUserId = user?.id || `guest_${Date.now()}`;
       const result = await createEnquiry({
-        userId: user.id,
+        userId: activeUserId,
         listingId,
         listingType,
         listingTitle,
@@ -110,21 +111,12 @@ const EnquiryDialog = ({ listingId, listingType, listingTitle, ownerId, trigger 
   };
 
   const handleOpen = () => {
-    if (!user) {
-      toast({
-        title: "Login Required",
-        description: "Please login to send an enquiry",
-        variant: "destructive",
-      });
-      navigate("/auth");
-      return;
-    }
     // Pre-fill email if user is logged in
-    if (user.email) {
+    if (user?.email) {
       setFormData(prev => ({
         ...prev,
         email: user.email || "",
-        name: user.user_metadata?.first_name || ""
+        name: user.user_metadata?.first_name ? `${user.user_metadata.first_name} ${user.user_metadata.last_name || ''}`.trim() : prev.name
       }));
     }
     setOpen(true);

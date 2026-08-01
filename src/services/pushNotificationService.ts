@@ -109,7 +109,7 @@ class PushNotificationService {
             };
 
             // Save to Supabase (you'll need to create this table)
-            const { error } = await supabase
+            const { error } = await (supabase as any)
                 .from('push_subscriptions')
                 .upsert(subscriptionData, {
                     onConflict: 'user_id',
@@ -128,16 +128,10 @@ class PushNotificationService {
     // Request notification permission
     async requestPermission(): Promise<NotificationPermission> {
         if (!('Notification' in window)) {
-            console.log('Notifications not supported');
             return 'denied';
         }
 
         const permission = await Notification.requestPermission();
-
-        if (permission === 'granted') {
-            await this.subscribeToPush();
-        }
-
         return permission;
     }
 
@@ -147,7 +141,7 @@ class PushNotificationService {
             throw new Error('Service Worker not registered');
         }
 
-        const options: NotificationOptions = {
+        const options: any = {
             body: payload.body,
             icon: payload.icon || '/icon-192.png',
             badge: payload.badge || '/badge-72.png',
@@ -168,10 +162,7 @@ class PushNotificationService {
 
     // Unsubscribe from push notifications
     async unsubscribe(): Promise<void> {
-        if (!this.subscription) {
-            console.log('No active subscription');
-            return;
-        }
+        if (!this.subscription) return;
 
         try {
             await this.subscription.unsubscribe();
@@ -179,7 +170,7 @@ class PushNotificationService {
             // Remove from backend
             const { data: { user } } = await supabase.auth.getUser();
             if (user) {
-                await supabase
+                await (supabase as any)
                     .from('push_subscriptions')
                     .delete()
                     .eq('user_id', user.id);

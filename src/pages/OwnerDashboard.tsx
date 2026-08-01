@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 import { Button } from "@/components/ui/button";
@@ -23,23 +23,84 @@ import {
   X,
   Image as ImageIcon,
   Loader2,
-  CheckCircle
+  CheckCircle,
+  Sparkles,
+  CreditCard,
+  ShieldAlert,
+  MessageSquare,
+  AlertTriangle,
+  Users,
+  TrendingUp,
+  Coins,
+  Ban,
+  UserCheck,
+  FileText,
+  Check,
+  XCircle,
+  Navigation,
+  ExternalLink
 } from "lucide-react";
 import { createRoom, updateRoom, deleteRoom, getRoomsByOwner, toggleRoomActive, Room } from "@/services/roomService";
 import { createMess, updateMess, deleteMess, getMessByOwner, toggleMessActive, Mess } from "@/services/messService";
-import { geocodeAddress } from "@/services/placesService";
+import { geocodeAddress, reverseGeocode } from "@/services/placesService";
+import { uploadListingImage } from "@/services/uploadService";
+import { getPlatformSettings } from "@/services/settingsService";
+import { fetchOwnerSubscriptions, fetchOwnerRoomBookings } from "@/services/bookingService";
+import { blockUser, unblockUser, getBlockedUsers } from "@/services/ownerBlockService";
+import {
+  getReviews,
+  replyToReview,
+  deleteReviewReply,
+  getReports,
+  createReport,
+  Review as ModerationReview,
+  Report as ModerationReport
+} from "@/services/moderationService";
 
 const OwnerDashboard = () => {
   const { user, userRole, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState("my-rooms");
+  const [searchParams, setSearchParams] = useSearchParams();
 
   // Data states
   const [myRooms, setMyRooms] = useState<Room[]>([]);
   const [myMess, setMyMess] = useState<Mess[]>([]);
   const [loadingRooms, setLoadingRooms] = useState(false);
   const [loadingMess, setLoadingMess] = useState(false);
+  const [subscriptions, setSubscriptions] = useState<any[]>([]);
+  const [loadingSubs, setLoadingSubs] = useState(false);
+  const [roomBookings, setRoomBookings] = useState<any[]>([]);
+  const [loadingRoomBookings, setLoadingRoomBookings] = useState(false);
+
+  // Moderation & Control states
+  const [blockedUsers, setBlockedUsers] = useState<string[]>([]);
+  const [reviews, setReviews] = useState<ModerationReview[]>([]);
+  const [loadingReviews, setLoadingReviews] = useState(false);
+  const [reports, setReports] = useState<ModerationReport[]>([]);
+  const [loadingReports, setLoadingReports] = useState(false);
+  const [replyText, setReplyText] = useState("");
+  const [selectedReviewForReply, setSelectedReviewForReply] = useState<string | null>(null);
+  const [submittingReply, setSubmittingReply] = useState(false);
+  const [reportingUser, setReportingUser] = useState<any | null>(null);
+  const [reportReason, setReportReason] = useState("");
+  const [submittingReport, setSubmittingReport] = useState(false);
+  const [selectedUserHistory, setSelectedUserHistory] = useState<any | null>(null);
+  const [activeModSubTab, setActiveModSubTab] = useState<"users" | "reviews" | "reports">("users");
+  const [showCustomerReviewsModal, setShowCustomerReviewsModal] = useState(false);
+  const [reviewListingTypeFilter, setReviewListingTypeFilter] = useState<"all" | "room" | "mess">("all");
+
+  // Price validation settings bounds
+  const [minRentPrice, setMinRentPrice] = useState<number>(500);
+  const [maxRentPrice, setMaxRentPrice] = useState<number>(100000);
+  const [featuredListingPrice, setFeaturedListingPrice] = useState<number>(500);
+
+  // Edit states
+  const [editingRoom, setEditingRoom] = useState<Room | null>(null);
+  const [editingMess, setEditingMess] = useState<Mess | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [promotingListing, setPromotingListing] = useState<{ id: string; type: "room" | "mess"; title: string } | null>(null);
+  const [promoting, setPromoting] = useState(false);
 
   // Form states for Room
   const [roomForm, setRoomForm] = useState({
@@ -49,19 +110,14 @@ const OwnerDashboard = () => {
     address: "",
     city: "",
     price: "",
-    room_type: "Single",
+    deposit: "",
+    room_type: "single",
     facilities: [] as string[],
     images: [] as string[],
-    deposit: "",
     available_from: "",
     preferred_tenants: "",
     rules: "",
   });
-  const [roomImages, setRoomImages] = useState<File[]>([]);
-  const [roomImagePreviews, setRoomImagePreviews] = useState<string[]>([]);
-  const [savingRoom, setSavingRoom] = useState(false);
-  const [geocodingRoom, setGeocodingRoom] = useState(false);
-  const [roomCoords, setRoomCoords] = useState<{ lat: number; lng: number } | null>(null);
 
   // Form states for Mess
   const [messForm, setMessForm] = useState({
@@ -71,11 +127,38 @@ const OwnerDashboard = () => {
     address: "",
     city: "",
     price_per_month: "",
-    food_type: "both",
+    food_type: "veg" as "veg" | "non-veg" | "both",
     timings: "",
     menu_highlights: "",
     images: [] as string[],
+    weekly_menu: null as any,
   });
+
+  // Active tab
+  const [activeTab, setActiveTab] = useState(() => {
+    return searchParams.get("tab") || "my-rooms";
+  });
+
+  // Sync activeTab with URL param
+  useEffect(() => {
+    const tab = searchParams.get("tab");
+    if (tab && tab !== activeTab) {
+      setActiveTab(tab);
+    }
+  }, [searchParams]);
+
+  // Update search param when activeTab changes
+  const handleTabChange = (value: string) => {
+    setActiveTab(value);
+    setSearchParams({ tab: value });
+  };
+
+  const [roomImages, setRoomImages] = useState<File[]>([]);
+  const [roomImagePreviews, setRoomImagePreviews] = useState<string[]>([]);
+  const [savingRoom, setSavingRoom] = useState(false);
+  const [geocodingRoom, setGeocodingRoom] = useState(false);
+  const [roomCoords, setRoomCoords] = useState<{ lat: number; lng: number } | null>(null);
+
   const [messImages, setMessImages] = useState<File[]>([]);
   const [messImagePreviews, setMessImagePreviews] = useState<string[]>([]);
   const [savingMess, setSavingMess] = useState(false);
@@ -91,17 +174,41 @@ const OwnerDashboard = () => {
   ];
 
   useEffect(() => {
-    if (!authLoading && !user) {
-      navigate("/auth");
+    if (!authLoading) {
+      if (!user) {
+        navigate("/auth");
+      } else if (userRole === "admin") {
+        navigate("/admin/dashboard");
+      } else if (userRole === "user") {
+        navigate("/dashboard");
+      }
     }
-  }, [user, authLoading, navigate]);
+  }, [user, userRole, authLoading, navigate]);
 
   useEffect(() => {
     if (user) {
       fetchMyRooms();
       fetchMyMess();
+      fetchSubscriptions();
+      fetchModerationData();
     }
   }, [user]);
+
+  useEffect(() => {
+    const fetchBounds = async () => {
+      try {
+        const settings = await getPlatformSettings();
+        if (settings) {
+          setMinRentPrice(settings.min_rent_price ?? 500);
+          setMaxRentPrice(settings.max_rent_price ?? 100000);
+          setFeaturedListingPrice(settings.featured_listing_price ?? 500);
+        }
+      } catch (err) {
+        console.error("Error fetching price bounds:", err);
+      }
+    };
+    fetchBounds();
+  }, []);
 
   const fetchMyRooms = async () => {
     if (!user) return;
@@ -126,6 +233,256 @@ const OwnerDashboard = () => {
       console.error("Error fetching mess:", error);
     } finally {
       setLoadingMess(false);
+    }
+  };
+
+  const fetchSubscriptions = async () => {
+    if (!user) return;
+    setLoadingSubs(true);
+    setLoadingRoomBookings(true);
+    try {
+      const data = await fetchOwnerSubscriptions(user.id);
+      setSubscriptions(data);
+      const roomData = await fetchOwnerRoomBookings(user.id);
+      setRoomBookings(roomData);
+    } catch (error) {
+      console.error("Error fetching subscriptions/bookings:", error);
+    } finally {
+      setLoadingSubs(false);
+      setLoadingRoomBookings(false);
+    }
+  };
+
+  const fetchModerationData = async () => {
+    if (!user) return;
+    setLoadingReviews(true);
+    setLoadingReports(true);
+    try {
+      const blocked = await getBlockedUsers(user.id);
+      setBlockedUsers(blocked);
+
+      const allReviews = await getReviews();
+      setReviews(allReviews);
+
+      const allReports = await getReports();
+      setReports(allReports);
+    } catch (err) {
+      console.error("Error fetching moderation data:", err);
+    } finally {
+      setLoadingReviews(false);
+      setLoadingReports(false);
+    }
+  };
+
+  const handleToggleBlock = async (targetUserId: string) => {
+    if (!user) return;
+    const isBlocked = blockedUsers.includes(targetUserId);
+    try {
+      if (isBlocked) {
+        await unblockUser(user.id, targetUserId);
+        toast({ title: "User Unblocked ✓", description: "They can now view and book your listings." });
+      } else {
+        await blockUser(user.id, targetUserId);
+        toast({ title: "User Blocked 🚫", description: "They cannot view or book your listings anymore." });
+      }
+      fetchModerationData();
+    } catch (err: any) {
+      toast({ title: "Block Action Failed", description: err.message, variant: "destructive" });
+    }
+  };
+
+  const handleReplySubmit = async (reviewId: string) => {
+    if (!replyText.trim()) return;
+    setSubmittingReply(true);
+    try {
+      await replyToReview(reviewId, replyText.trim());
+      toast({ title: "Reply Posted ✓", description: "Your response is now public." });
+      setReplyText("");
+      setSelectedReviewForReply(null);
+      fetchModerationData();
+    } catch (err: any) {
+      toast({ title: "Failed to post reply", description: err.message, variant: "destructive" });
+    } finally {
+      setSubmittingReply(false);
+    }
+  };
+
+  const handleReplyDelete = async (reviewId: string) => {
+    if (!confirm("Are you sure you want to delete your response to this review?")) return;
+    try {
+      await deleteReviewReply(reviewId);
+      toast({ title: "Reply Deleted ✓" });
+      fetchModerationData();
+    } catch (err: any) {
+      toast({ title: "Failed to delete reply", description: err.message, variant: "destructive" });
+    }
+  };
+
+  const handleUserReportSubmit = async () => {
+    if (!user || !reportingUser || !reportReason.trim()) return;
+    setSubmittingReport(true);
+    try {
+      await createReport(user.id, "user", reportingUser.id, reportReason.trim());
+      toast({ title: "User Reported 📋", description: "Our administration panel has received your complaint." });
+      setReportReason("");
+      setReportingUser(null);
+      fetchModerationData();
+    } catch (err: any) {
+      toast({ title: "Failed to submit report", description: err.message, variant: "destructive" });
+    } finally {
+      setSubmittingReport(false);
+    }
+  };
+
+  const getUniqueCustomers = () => {
+    const userMap = new Map<string, any>();
+
+    roomBookings.forEach((b) => {
+      const existing = userMap.get(b.userId) || {
+        id: b.userId,
+        name: b.userName || "User",
+        email: b.userEmail || "N/A",
+        phone: b.userPhone || "N/A",
+        bookings: [],
+        totalPaid: 0,
+      };
+      existing.bookings.push({
+        type: "room",
+        id: b.id,
+        title: b.listingTitle,
+        amount: b.amount,
+        status: b.status,
+        date: b.createdAt,
+      });
+      existing.totalPaid += b.amount;
+      userMap.set(b.userId, existing);
+    });
+
+    subscriptions.forEach((s) => {
+      const existing = userMap.get(s.userId) || {
+        id: s.userId,
+        name: s.userName || "User",
+        email: s.userEmail || "N/A",
+        phone: s.userPhone || "N/A",
+        bookings: [],
+        totalPaid: 0,
+      };
+      existing.bookings.push({
+        type: "mess",
+        id: s.id,
+        title: s.messTitle,
+        amount: s.amount,
+        status: s.status,
+        date: s.startDate,
+      });
+      existing.totalPaid += s.amount;
+      userMap.set(s.userId, existing);
+    });
+
+    return Array.from(userMap.values());
+  };
+
+  const handlePromoteListing = async () => {
+    if (!promotingListing) return;
+    setPromoting(true);
+    try {
+      const now = new Date();
+      const featuredUntil = new Date(now.setDate(now.getDate() + 30)).toISOString();
+      
+      if (promotingListing.type === "room") {
+        await updateRoom(promotingListing.id, {
+          is_featured: true,
+          featured_until: featuredUntil
+        });
+        toast({ title: "Property Promoted ★", description: "Your room is now featured for 30 days!" });
+        fetchMyRooms();
+      } else {
+        await updateMess(promotingListing.id, {
+          is_featured: true,
+          featured_until: featuredUntil
+        });
+        toast({ title: "Mess Promoted ★", description: "Your mess is now featured for 30 days!" });
+        fetchMyMess();
+      }
+      setPromotingListing(null);
+    } catch (err: any) {
+      toast({ title: "Promotion failed", description: err.message, variant: "destructive" });
+    } finally {
+      setPromoting(false);
+    }
+  };
+
+  // Save room edits
+  const saveRoom = async () => {
+    if (!editingRoom) return;
+    setSaving(true);
+    try {
+      const result = await updateRoom(editingRoom.id, {
+        title: editingRoom.title,
+        description: editingRoom.description,
+        location: editingRoom.location,
+        address: editingRoom.address,
+        city: editingRoom.city,
+        price: Number(editingRoom.price),
+        deposit: Number(editingRoom.deposit),
+        room_type: editingRoom.room_type,
+        facilities: editingRoom.facilities,
+        rules: editingRoom.rules,
+        preferred_tenants: editingRoom.preferred_tenants,
+        available_from: editingRoom.available_from,
+        images: editingRoom.images,
+        latitude: editingRoom.latitude,
+        longitude: editingRoom.longitude,
+      });
+
+      if (result) {
+        toast({ title: "Room listing updated successfully ✓" });
+        setEditingRoom(null);
+        fetchMyRooms();
+      } else {
+        toast({ title: "Failed to update room", variant: "destructive" });
+      }
+    } catch (err: any) {
+      toast({ title: "Error updating room", description: err.message, variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Save mess edits
+  const saveMess = async () => {
+    if (!editingMess) return;
+    setSaving(true);
+    try {
+      const result = await updateMess(editingMess.id, {
+        name: editingMess.name,
+        description: editingMess.description,
+        location: editingMess.location,
+        address: editingMess.address,
+        city: editingMess.city,
+        price_per_month: Number(editingMess.price_per_month),
+        food_type: editingMess.food_type as any,
+        timings: editingMess.timings,
+        menu_highlights: typeof editingMess.menu_highlights === 'string'
+          ? (editingMess.menu_highlights as string).split(",").map(s => s.trim()).filter(Boolean)
+          : editingMess.menu_highlights,
+        images: editingMess.images,
+        weekly_menu: editingMess.weekly_menu,
+        latitude: editingMess.latitude,
+        longitude: editingMess.longitude,
+      });
+
+      if (result) {
+        toast({ title: "Mess listing updated successfully ✓" });
+        setEditingMess(null);
+        fetchMyMess();
+      } else {
+        toast({ title: "Failed to update mess", variant: "destructive" });
+      }
+    } catch (err: any) {
+      toast({ title: "Error updating mess", description: err.message, variant: "destructive" });
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -186,87 +543,342 @@ const OwnerDashboard = () => {
     setMessImagePreviews(prev => prev.filter((_, i) => i !== index));
   };
 
-  // Geocode room address
+  // Geocode room address or fetch live GPS location
   const geocodeRoomAddress = async () => {
-    if (!roomForm.address || !roomForm.city) {
+    if (!roomForm.address && !roomForm.city) {
+      return useCurrentDeviceLocationForRoom();
+    }
+
+    setGeocodingRoom(true);
+    try {
+      const fullAddress = `${roomForm.address || ""}, ${roomForm.city || ""}`.trim();
+      const result = await geocodeAddress(fullAddress);
+      if (result) {
+        setRoomCoords({ lat: result.lat, lng: result.lng });
+        setRoomForm(prev => ({
+          ...prev,
+          location: prev.location || `${result.area || roomForm.city}, ${result.city || roomForm.city}`,
+        }));
+        toast({
+          title: "Location Coordinates Marked ✓",
+          description: `Pinned at: ${result.lat.toFixed(4)}, ${result.lng.toFixed(4)}`,
+        });
+      } else {
+        toast({
+          title: "Address Geocoding Failed",
+          description: "Fetching your current live GPS location...",
+        });
+        useCurrentDeviceLocationForRoom();
+      }
+    } catch (error) {
+      console.error("Geocoding error:", error);
+      useCurrentDeviceLocationForRoom();
+    } finally {
+      setGeocodingRoom(false);
+    }
+  };
+
+  // Device GPS Location for Room
+  const useCurrentDeviceLocationForRoom = () => {
+    if (!navigator.geolocation) {
       toast({
-        title: "Address Required",
-        description: "Please enter address and city first",
+        title: "Geolocation Unsupported",
+        description: "Your browser does not support live GPS location.",
         variant: "destructive",
       });
       return;
     }
 
     setGeocodingRoom(true);
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const lat = Number(position.coords.latitude.toFixed(4));
+        const lng = Number(position.coords.longitude.toFixed(4));
+        setRoomCoords({ lat, lng });
+
+        // Reverse geocode to auto-fill address if empty
+        const geoInfo = await reverseGeocode(lat, lng);
+        if (geoInfo) {
+          setRoomForm(prev => ({
+            ...prev,
+            address: prev.address || geoInfo.address,
+            city: prev.city || geoInfo.city,
+            location: prev.location || `${geoInfo.area || geoInfo.city}, ${geoInfo.city}`,
+          }));
+        }
+
+        toast({
+          title: "Current GPS Location Marked ✓",
+          description: `Live Coordinates: ${lat}, ${lng}`,
+        });
+        setGeocodingRoom(false);
+      },
+      (error) => {
+        console.error("Device location error:", error);
+        toast({
+          title: "GPS Location Error",
+          description: "Permission denied or unavailable. Please type address and try again.",
+          variant: "destructive",
+        });
+        setGeocodingRoom(false);
+      },
+      { timeout: 10000, enableHighAccuracy: true }
+    );
+  };
+
+  // Geocode mess address or fetch live GPS location
+  const geocodeMessAddress = async () => {
+    if (!messForm.address && !messForm.city) {
+      return useCurrentDeviceLocationForMess();
+    }
+
+    setGeocodingMess(true);
     try {
-      const fullAddress = `${roomForm.address}, ${roomForm.city}`;
+      const fullAddress = `${messForm.address || ""}, ${messForm.city || ""}`.trim();
       const result = await geocodeAddress(fullAddress);
       if (result) {
-        setRoomCoords({ lat: result.lat, lng: result.lng });
-        setRoomForm(prev => ({
+        setMessCoords({ lat: result.lat, lng: result.lng });
+        setMessForm(prev => ({
           ...prev,
-          location: `${result.area || roomForm.city}, ${result.city}`,
+          location: prev.location || `${result.area || messForm.city}, ${result.city || messForm.city}`,
         }));
         toast({
-          title: "Location Found",
-          description: `Coordinates: ${result.lat.toFixed(4)}, ${result.lng.toFixed(4)}`,
+          title: "Location Coordinates Marked ✓",
+          description: `Pinned at: ${result.lat.toFixed(4)}, ${result.lng.toFixed(4)}`,
         });
       } else {
         toast({
-          title: "Location Not Found",
-          description: "Could not find coordinates for this address",
-          variant: "destructive",
+          title: "Address Geocoding Failed",
+          description: "Fetching your current live GPS location...",
         });
+        useCurrentDeviceLocationForMess();
       }
     } catch (error) {
       console.error("Geocoding error:", error);
-      toast({
-        title: "Geocoding Failed",
-        description: "Failed to get location coordinates",
-        variant: "destructive",
-      });
+      useCurrentDeviceLocationForMess();
     } finally {
-      setGeocodingRoom(false);
+      setGeocodingMess(false);
     }
   };
 
-  // Geocode mess address
-  const geocodeMessAddress = async () => {
-    if (!messForm.address || !messForm.city) {
+  // Device GPS Location for Mess
+  const useCurrentDeviceLocationForMess = () => {
+    if (!navigator.geolocation) {
       toast({
-        title: "Address Required",
-        description: "Please enter address and city first",
+        title: "Geolocation Unsupported",
+        description: "Your browser does not support live GPS location.",
         variant: "destructive",
       });
       return;
     }
 
     setGeocodingMess(true);
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const lat = Number(position.coords.latitude.toFixed(4));
+        const lng = Number(position.coords.longitude.toFixed(4));
+        setMessCoords({ lat, lng });
+
+        // Reverse geocode to auto-fill address if empty
+        const geoInfo = await reverseGeocode(lat, lng);
+        if (geoInfo) {
+          setMessForm(prev => ({
+            ...prev,
+            address: prev.address || geoInfo.address,
+            city: prev.city || geoInfo.city,
+            location: prev.location || `${geoInfo.area || geoInfo.city}, ${geoInfo.city}`,
+          }));
+        }
+
+        toast({
+          title: "Current GPS Location Marked ✓",
+          description: `Live Coordinates: ${lat}, ${lng}`,
+        });
+        setGeocodingMess(false);
+      },
+      (error) => {
+        console.error("Device location error:", error);
+        toast({
+          title: "GPS Location Error",
+          description: "Permission denied or unavailable. Please type address and try again.",
+          variant: "destructive",
+        });
+        setGeocodingMess(false);
+      },
+      { timeout: 10000, enableHighAccuracy: true }
+    );
+  };
+
+  // Geocode address or fetch live GPS for Editing Room
+  const geocodeEditingRoomAddress = async () => {
+    if (!editingRoom) return;
+    if (!editingRoom.address && !editingRoom.city) {
+      return useCurrentDeviceLocationForEditingRoom();
+    }
+
+    setGeocodingRoom(true);
     try {
-      const fullAddress = `${messForm.address}, ${messForm.city}`;
+      const fullAddress = `${editingRoom.address || ""}, ${editingRoom.city || ""}`.trim();
       const result = await geocodeAddress(fullAddress);
       if (result) {
-        setMessCoords({ lat: result.lat, lng: result.lng });
-        setMessForm(prev => ({
-          ...prev,
-          location: `${result.area || messForm.city}, ${result.city}`,
-        }));
+        setEditingRoom({
+          ...editingRoom,
+          latitude: result.lat,
+          longitude: result.lng,
+          location: editingRoom.location || `${result.area || editingRoom.city}, ${result.city || editingRoom.city}`,
+        });
         toast({
-          title: "Location Found",
-          description: `Coordinates: ${result.lat.toFixed(4)}, ${result.lng.toFixed(4)}`,
+          title: "Location Coordinates Marked ✓",
+          description: `Pinned at: ${result.lat.toFixed(4)}, ${result.lng.toFixed(4)}`,
         });
       } else {
         toast({
-          title: "Location Not Found",
-          description: "Could not find coordinates for this address",
-          variant: "destructive",
+          title: "Address Geocoding Failed",
+          description: "Fetching current device live GPS location...",
         });
+        useCurrentDeviceLocationForEditingRoom();
       }
     } catch (error) {
       console.error("Geocoding error:", error);
+      useCurrentDeviceLocationForEditingRoom();
+    } finally {
+      setGeocodingRoom(false);
+    }
+  };
+
+  const useCurrentDeviceLocationForEditingRoom = () => {
+    if (!editingRoom) return;
+    if (!navigator.geolocation) {
+      toast({
+        title: "Geolocation Unsupported",
+        description: "Your browser does not support live GPS location.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setGeocodingRoom(true);
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const lat = Number(position.coords.latitude.toFixed(4));
+        const lng = Number(position.coords.longitude.toFixed(4));
+
+        const geoInfo = await reverseGeocode(lat, lng);
+        setEditingRoom(prev => {
+          if (!prev) return null;
+          return {
+            ...prev,
+            latitude: lat,
+            longitude: lng,
+            address: prev.address || geoInfo?.address || "",
+            city: prev.city || geoInfo?.city || "",
+            location: prev.location || `${geoInfo?.area || geoInfo?.city || ""}, ${geoInfo?.city || ""}`,
+          };
+        });
+
+        toast({
+          title: "Current GPS Location Marked ✓",
+          description: `Live Coordinates: ${lat}, ${lng}`,
+        });
+        setGeocodingRoom(false);
+      },
+      (error) => {
+        console.error("Device location error:", error);
+        toast({
+          title: "GPS Location Error",
+          description: "Permission denied or unavailable. Please type address and try again.",
+          variant: "destructive",
+        });
+        setGeocodingRoom(false);
+      },
+      { timeout: 10000, enableHighAccuracy: true }
+    );
+  };
+
+  // Geocode address or fetch live GPS for Editing Mess
+  const geocodeEditingMessAddress = async () => {
+    if (!editingMess) return;
+    if (!editingMess.address && !editingMess.city) {
+      return useCurrentDeviceLocationForEditingMess();
+    }
+
+    setGeocodingMess(true);
+    try {
+      const fullAddress = `${editingMess.address || ""}, ${editingMess.city || ""}`.trim();
+      const result = await geocodeAddress(fullAddress);
+      if (result) {
+        setEditingMess({
+          ...editingMess,
+          latitude: result.lat,
+          longitude: result.lng,
+          location: editingMess.location || `${result.area || editingMess.city}, ${result.city || editingMess.city}`,
+        });
+        toast({
+          title: "Location Coordinates Marked ✓",
+          description: `Pinned at: ${result.lat.toFixed(4)}, ${result.lng.toFixed(4)}`,
+        });
+      } else {
+        toast({
+          title: "Address Geocoding Failed",
+          description: "Fetching current device live GPS location...",
+        });
+        useCurrentDeviceLocationForEditingMess();
+      }
+    } catch (error) {
+      console.error("Geocoding error:", error);
+      useCurrentDeviceLocationForEditingMess();
     } finally {
       setGeocodingMess(false);
     }
+  };
+
+  const useCurrentDeviceLocationForEditingMess = () => {
+    if (!editingMess) return;
+    if (!navigator.geolocation) {
+      toast({
+        title: "Geolocation Unsupported",
+        description: "Your browser does not support live GPS location.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setGeocodingMess(true);
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const lat = Number(position.coords.latitude.toFixed(4));
+        const lng = Number(position.coords.longitude.toFixed(4));
+
+        const geoInfo = await reverseGeocode(lat, lng);
+        setEditingMess(prev => {
+          if (!prev) return null;
+          return {
+            ...prev,
+            latitude: lat,
+            longitude: lng,
+            address: prev.address || geoInfo?.address || "",
+            city: prev.city || geoInfo?.city || "",
+            location: prev.location || `${geoInfo?.area || geoInfo?.city || ""}, ${geoInfo?.city || ""}`,
+          };
+        });
+
+        toast({
+          title: "Current GPS Location Marked ✓",
+          description: `Live Coordinates: ${lat}, ${lng}`,
+        });
+        setGeocodingMess(false);
+      },
+      (error) => {
+        console.error("Device location error:", error);
+        toast({
+          title: "GPS Location Error",
+          description: "Permission denied or unavailable. Please type address and try again.",
+          variant: "destructive",
+        });
+        setGeocodingMess(false);
+      },
+      { timeout: 10000, enableHighAccuracy: true }
+    );
   };
 
   // Toggle facility selection
@@ -287,6 +899,16 @@ const OwnerDashboard = () => {
       toast({
         title: "Missing Fields",
         description: "Please fill in title, address, and price",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const rentPrice = parseFloat(roomForm.price);
+    if (isNaN(rentPrice) || rentPrice < minRentPrice || rentPrice > maxRentPrice) {
+      toast({
+        title: "Invalid Rent Price",
+        description: `Rent price must be between ₹${minRentPrice.toLocaleString()} and ₹${maxRentPrice.toLocaleString()}`,
         variant: "destructive",
       });
       return;
@@ -344,7 +966,7 @@ const OwnerDashboard = () => {
       setRoomCoords(null);
 
       fetchMyRooms();
-      setActiveTab("my-rooms");
+      handleTabChange("my-rooms");
     } catch (error) {
       console.error("Error saving room:", error);
       toast({
@@ -370,6 +992,16 @@ const OwnerDashboard = () => {
       return;
     }
 
+    const messPrice = parseFloat(messForm.price_per_month);
+    if (isNaN(messPrice) || messPrice < minRentPrice || messPrice > maxRentPrice) {
+      toast({
+        title: "Invalid Mess Price",
+        description: `Mess price must be between ₹${minRentPrice.toLocaleString()} and ₹${maxRentPrice.toLocaleString()}`,
+        variant: "destructive",
+      });
+      return;
+    }
+
     setSavingMess(true);
     try {
       const imageUrls = messImagePreviews.length > 0
@@ -386,8 +1018,11 @@ const OwnerDashboard = () => {
         price_per_month: parseFloat(messForm.price_per_month),
         food_type: messForm.food_type,
         timings: messForm.timings,
-        menu_highlights: messForm.menu_highlights.split(",").map(s => s.trim()).filter(Boolean),
+        menu_highlights: typeof messForm.menu_highlights === 'string'
+          ? messForm.menu_highlights.split(",").map(s => s.trim()).filter(Boolean)
+          : Array.isArray(messForm.menu_highlights) ? messForm.menu_highlights : [],
         images: imageUrls,
+        weekly_menu: messForm.weekly_menu || null,
         latitude: messCoords?.lat,
         longitude: messCoords?.lng,
         is_active: true,
@@ -413,13 +1048,14 @@ const OwnerDashboard = () => {
         timings: "",
         menu_highlights: "",
         images: [],
+        weekly_menu: null,
       });
       setMessImages([]);
       setMessImagePreviews([]);
       setMessCoords(null);
 
       fetchMyMess();
-      setActiveTab("my-mess");
+      handleTabChange("my-mess");
     } catch (error) {
       console.error("Error saving mess:", error);
       toast({
@@ -514,8 +1150,8 @@ const OwnerDashboard = () => {
           </div>
 
           {/* Tabs */}
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="grid grid-cols-4 w-full max-w-2xl mb-8">
+          <Tabs value={activeTab} onValueChange={handleTabChange}>
+            <TabsList className="grid grid-cols-6 w-full max-w-4xl mb-8">
               <TabsTrigger value="my-rooms" className="gap-2">
                 <Building2 className="w-4 h-4" />
                 My Rooms
@@ -524,6 +1160,10 @@ const OwnerDashboard = () => {
                 <UtensilsCrossed className="w-4 h-4" />
                 My Mess
               </TabsTrigger>
+              <TabsTrigger value="bookings" className="gap-2">
+                <CheckCircle className="w-4 h-4" />
+                Bookings & Subs
+              </TabsTrigger>
               <TabsTrigger value="add-room" className="gap-2">
                 <Plus className="w-4 h-4" />
                 Add Room
@@ -531,6 +1171,10 @@ const OwnerDashboard = () => {
               <TabsTrigger value="add-mess" className="gap-2">
                 <Plus className="w-4 h-4" />
                 Add Mess
+              </TabsTrigger>
+              <TabsTrigger value="moderation" className="gap-2">
+                <ShieldAlert className="w-4 h-4" />
+                Users & Moderation
               </TabsTrigger>
             </TabsList>
 
@@ -567,6 +1211,9 @@ const OwnerDashboard = () => {
                             {room.is_verified && (
                               <Badge className="bg-success text-white">Verified</Badge>
                             )}
+                            {room.is_featured && (
+                              <Badge className="bg-amber-500 text-white font-semibold">★ Featured</Badge>
+                            )}
                             {!room.is_active && (
                               <Badge variant="secondary">Hidden</Badge>
                             )}
@@ -575,6 +1222,17 @@ const OwnerDashboard = () => {
                           <p className="font-semibold text-primary">₹{room.price?.toLocaleString()}/month</p>
                         </div>
                         <div className="flex items-center gap-2">
+                          {!room.is_featured && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="border-amber-500 hover:bg-amber-50 text-amber-600 font-medium h-9 text-xs"
+                              onClick={() => setPromotingListing({ id: room.id, type: "room", title: room.title })}
+                            >
+                              <Sparkles className="w-3.5 h-3.5 mr-1" />
+                              Promote
+                            </Button>
+                          )}
                           <Button
                             variant="outline"
                             size="icon"
@@ -585,7 +1243,8 @@ const OwnerDashboard = () => {
                           <Button
                             variant="outline"
                             size="icon"
-                            onClick={() => navigate(`/rooms/${room.id}`)}
+                            onClick={() => setEditingRoom(room)}
+                            title="Edit details"
                           >
                             <Edit className="w-4 h-4" />
                           </Button>
@@ -637,6 +1296,9 @@ const OwnerDashboard = () => {
                             {mess.is_verified && (
                               <Badge className="bg-success text-white">Verified</Badge>
                             )}
+                            {mess.is_featured && (
+                              <Badge className="bg-amber-500 text-white font-semibold">★ Featured</Badge>
+                            )}
                             {!mess.is_active && (
                               <Badge variant="secondary">Hidden</Badge>
                             )}
@@ -645,6 +1307,17 @@ const OwnerDashboard = () => {
                           <p className="font-semibold text-primary">₹{mess.price_per_month?.toLocaleString()}/month</p>
                         </div>
                         <div className="flex items-center gap-2">
+                          {!mess.is_featured && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="border-amber-500 hover:bg-amber-50 text-amber-600 font-medium h-9 text-xs"
+                              onClick={() => setPromotingListing({ id: mess.id, type: "mess", title: mess.name })}
+                            >
+                              <Sparkles className="w-3.5 h-3.5 mr-1" />
+                              Promote
+                            </Button>
+                          )}
                           <Button
                             variant="outline"
                             size="icon"
@@ -655,7 +1328,8 @@ const OwnerDashboard = () => {
                           <Button
                             variant="outline"
                             size="icon"
-                            onClick={() => navigate(`/mess/${mess.id}`)}
+                            onClick={() => setEditingMess(mess)}
+                            title="Edit details"
                           >
                             <Edit className="w-4 h-4" />
                           </Button>
@@ -671,6 +1345,142 @@ const OwnerDashboard = () => {
                     ))}
                   </div>
                 )}
+              </div>
+            </TabsContent>
+
+            {/* Bookings & Subscriptions Tab */}
+            <TabsContent value="bookings">
+              <div className="space-y-8">
+                {/* Room Bookings */}
+                <div className="bg-card rounded-2xl p-6 shadow-soft">
+                  <div className="flex items-center justify-between mb-6">
+                    <h2 className="font-heading font-semibold text-xl flex items-center gap-2">
+                      <Building2 className="w-5 h-5 text-primary" />
+                      Room Bookings
+                    </h2>
+                    <Button variant="outline" size="sm" onClick={fetchSubscriptions}>
+                      Refresh
+                    </Button>
+                  </div>
+
+                  {loadingRoomBookings ? (
+                    <div className="flex justify-center py-12">
+                      <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                    </div>
+                  ) : roomBookings.length === 0 ? (
+                    <div className="text-center py-12">
+                      <Building2 className="w-16 h-16 mx-auto text-muted-foreground/50 mb-4" />
+                      <p className="text-muted-foreground">No room bookings recorded yet</p>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto border rounded-xl">
+                      <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className="border-b bg-muted/30">
+                            <th className="py-3 px-4 font-semibold text-sm">Subscriber</th>
+                            <th className="py-3 px-4 font-semibold text-sm">Room Title</th>
+                            <th className="py-3 px-4 font-semibold text-sm">Details</th>
+                            <th className="py-3 px-4 font-semibold text-sm">Amount Paid</th>
+                            <th className="py-3 px-4 font-semibold text-sm">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {roomBookings.map((booking) => (
+                            <tr key={booking.id} className="border-b last:border-0 hover:bg-muted/10 transition-colors">
+                              <td className="py-3 px-4">
+                                <div className="font-medium text-foreground">{booking.userName}</div>
+                                <div className="text-xs text-muted-foreground">{booking.userPhone}</div>
+                              </td>
+                              <td className="py-3 px-4 font-medium">{booking.listingTitle}</td>
+                              <td className="py-3 px-4 text-xs text-muted-foreground">
+                                Booked on: {new Date(booking.createdAt).toLocaleDateString("en-IN")}
+                              </td>
+                              <td className="py-3 px-4 font-bold text-emerald-600 dark:text-emerald-400">
+                                ₹{booking.amount?.toLocaleString("en-IN")}
+                              </td>
+                              <td className="py-3 px-4">
+                                <Badge className="bg-success text-white">
+                                  {booking.status || "confirmed"}
+                                </Badge>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+
+                {/* Mess Subscriptions */}
+                <div className="bg-card rounded-2xl p-6 shadow-soft">
+                  <div className="flex items-center justify-between mb-6">
+                    <h2 className="font-heading font-semibold text-xl flex items-center gap-2">
+                      <UtensilsCrossed className="w-5 h-5 text-accent" />
+                      Mess Subscriptions
+                    </h2>
+                  </div>
+
+                  {loadingSubs ? (
+                    <div className="flex justify-center py-12">
+                      <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                    </div>
+                  ) : subscriptions.length === 0 ? (
+                    <div className="text-center py-12">
+                      <UtensilsCrossed className="w-16 h-16 mx-auto text-muted-foreground/50 mb-4" />
+                      <p className="text-muted-foreground">No mess subscriptions recorded yet</p>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto border rounded-xl">
+                      <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className="border-b bg-muted/30">
+                            <th className="py-3 px-4 font-semibold text-sm">Subscriber</th>
+                            <th className="py-3 px-4 font-semibold text-sm">Mess Title</th>
+                            <th className="py-3 px-4 font-semibold text-sm">Plan Type</th>
+                            <th className="py-3 px-4 font-semibold text-sm">Duration</th>
+                            <th className="py-3 px-4 font-semibold text-sm">Amount Paid</th>
+                            <th className="py-3 px-4 font-semibold text-sm">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {subscriptions.map((sub) => (
+                            <tr key={sub.id} className="border-b last:border-0 hover:bg-muted/10 transition-colors">
+                              <td className="py-3 px-4">
+                                <div className="font-medium text-foreground">{sub.userName}</div>
+                                <div className="text-xs text-muted-foreground">{sub.userPhone}</div>
+                              </td>
+                              <td className="py-3 px-4 font-medium">{sub.messTitle}</td>
+                              <td className="py-3 px-4 capitalize">
+                                <Badge variant="outline" className="font-medium">
+                                  {sub.planType}
+                                </Badge>
+                              </td>
+                              <td className="py-3 px-4 text-xs text-muted-foreground">
+                                {new Date(sub.startDate).toLocaleDateString("en-IN")} - {new Date(sub.endDate).toLocaleDateString("en-IN")}
+                              </td>
+                              <td className="py-3 px-4 font-bold text-emerald-600 dark:text-emerald-400">
+                                ₹{sub.amount?.toLocaleString("en-IN")}
+                              </td>
+                              <td className="py-3 px-4">
+                                <Badge
+                                  className={
+                                    sub.status === "active"
+                                      ? "bg-success text-white"
+                                      : sub.status === "paused"
+                                      ? "bg-amber-500 text-white"
+                                      : "bg-destructive text-white"
+                                  }
+                                >
+                                  {sub.status}
+                                </Badge>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
               </div>
             </TabsContent>
 
@@ -778,26 +1588,73 @@ const OwnerDashboard = () => {
                     </div>
                   </div>
 
-                  {/* Geocode Button */}
-                  <div className="flex items-center gap-4">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={geocodeRoomAddress}
-                      disabled={geocodingRoom}
-                    >
-                      {geocodingRoom ? (
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      ) : (
-                        <MapPin className="w-4 h-4 mr-2" />
-                      )}
-                      Get Location Coordinates
-                    </Button>
+                  {/* Geocode & Location Coordinates Section */}
+                  <div className="space-y-3 p-4 bg-muted/20 border rounded-xl">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <div>
+                        <Label className="text-sm font-semibold block text-foreground">Property Map Coordinates</Label>
+                        <p className="text-xs text-muted-foreground">Geocode from typed address or use your live device GPS location</p>
+                      </div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={geocodeRoomAddress}
+                          disabled={geocodingRoom}
+                          className="h-8 text-xs gap-1.5"
+                        >
+                          {geocodingRoom ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <MapPin className="w-3.5 h-3.5 text-primary" />
+                          )}
+                          Get Location Coordinates
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          onClick={useCurrentDeviceLocationForRoom}
+                          disabled={geocodingRoom}
+                          className="h-8 text-xs gap-1.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/30"
+                        >
+                          <Navigation className="w-3.5 h-3.5" />
+                          Use Live GPS Location
+                        </Button>
+                      </div>
+                    </div>
+
                     {roomCoords && (
-                      <span className="text-sm text-success flex items-center gap-1">
-                        <CheckCircle className="w-4 h-4" />
-                        Location found!
-                      </span>
+                      <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg flex items-center justify-between text-xs text-foreground">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle className="w-4 h-4 text-emerald-500 shrink-0" />
+                          <div>
+                            <span className="font-semibold text-emerald-600 dark:text-emerald-400">Location Coordinates Marked ✓</span>
+                            <p className="text-[11px] text-muted-foreground font-mono">
+                              Latitude: {roomCoords.lat.toFixed(4)}, Longitude: {roomCoords.lng.toFixed(4)}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <a
+                            href={`https://www.openstreetmap.org/?mlat=${roomCoords.lat}&mlon=${roomCoords.lng}#map=16/${roomCoords.lat}/${roomCoords.lng}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-primary hover:underline font-medium flex items-center gap-1 text-[11px]"
+                          >
+                            <ExternalLink className="w-3 h-3" />
+                            View Map
+                          </a>
+                          <button
+                            type="button"
+                            onClick={() => setRoomCoords(null)}
+                            className="text-destructive hover:underline text-[11px]"
+                          >
+                            Clear
+                          </button>
+                        </div>
+                      </div>
                     )}
                   </div>
 
@@ -954,7 +1811,7 @@ const OwnerDashboard = () => {
                       <select
                         id="mess-food-type"
                         value={messForm.food_type}
-                        onChange={(e) => setMessForm({ ...messForm, food_type: e.target.value })}
+                        onChange={(e) => setMessForm({ ...messForm, food_type: e.target.value as "veg" | "non-veg" | "both" })}
                         className="w-full h-10 px-3 rounded-md border border-input bg-background"
                       >
                         <option value="veg">Pure Vegetarian</option>
@@ -998,26 +1855,73 @@ const OwnerDashboard = () => {
                     </div>
                   </div>
 
-                  {/* Geocode */}
-                  <div className="flex items-center gap-4">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={geocodeMessAddress}
-                      disabled={geocodingMess}
-                    >
-                      {geocodingMess ? (
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      ) : (
-                        <MapPin className="w-4 h-4 mr-2" />
-                      )}
-                      Get Location Coordinates
-                    </Button>
+                  {/* Geocode & Location Coordinates Section */}
+                  <div className="space-y-3 p-4 bg-muted/20 border rounded-xl">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <div>
+                        <Label className="text-sm font-semibold block text-foreground">Mess Map Coordinates</Label>
+                        <p className="text-xs text-muted-foreground">Geocode from typed address or use your live device GPS location</p>
+                      </div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={geocodeMessAddress}
+                          disabled={geocodingMess}
+                          className="h-8 text-xs gap-1.5"
+                        >
+                          {geocodingMess ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <MapPin className="w-3.5 h-3.5 text-primary" />
+                          )}
+                          Get Location Coordinates
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          onClick={useCurrentDeviceLocationForMess}
+                          disabled={geocodingMess}
+                          className="h-8 text-xs gap-1.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/30"
+                        >
+                          <Navigation className="w-3.5 h-3.5" />
+                          Use Live GPS Location
+                        </Button>
+                      </div>
+                    </div>
+
                     {messCoords && (
-                      <span className="text-sm text-success flex items-center gap-1">
-                        <CheckCircle className="w-4 h-4" />
-                        Location found!
-                      </span>
+                      <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg flex items-center justify-between text-xs text-foreground">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle className="w-4 h-4 text-emerald-500 shrink-0" />
+                          <div>
+                            <span className="font-semibold text-emerald-600 dark:text-emerald-400">Location Coordinates Marked ✓</span>
+                            <p className="text-[11px] text-muted-foreground font-mono">
+                              Latitude: {messCoords.lat.toFixed(4)}, Longitude: {messCoords.lng.toFixed(4)}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <a
+                            href={`https://www.openstreetmap.org/?mlat=${messCoords.lat}&mlon=${messCoords.lng}#map=16/${messCoords.lat}/${messCoords.lng}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-primary hover:underline font-medium flex items-center gap-1 text-[11px]"
+                          >
+                            <ExternalLink className="w-3 h-3" />
+                            View Map
+                          </a>
+                          <button
+                            type="button"
+                            onClick={() => setMessCoords(null)}
+                            className="text-destructive hover:underline text-[11px]"
+                          >
+                            Clear
+                          </button>
+                        </div>
+                      </div>
                     )}
                   </div>
 
@@ -1055,6 +1959,98 @@ const OwnerDashboard = () => {
                     />
                   </div>
 
+                  {/* Weekly Menu Schedule Editor */}
+                  <div className="space-y-4 pt-4 border-t">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <div>
+                        <Label className="text-base font-semibold block text-foreground">Weekly Menu Schedule</Label>
+                        <p className="text-xs text-muted-foreground">Specify Lunch and Dinner menus for each day of the week</p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const defaultMenu = {
+                            Monday: { lunch: "Varan Bhaat, Bhaji, Chapati, Salad", dinner: "Misal Pav, Buttermilk" },
+                            Tuesday: { lunch: "Usal, Rice, Chapati, Papad", dinner: "Dal Khichdi, Kadhi" },
+                            Wednesday: { lunch: "Tambda Rassa, Rice, Bhakri", dinner: "Veg Pulao, Raita" },
+                            Thursday: { lunch: "Matki Usal, Chapati, Rice", dinner: "Chole Bhature" },
+                            Friday: { lunch: "Pandhra Rassa, Rice, Bhakri", dinner: "Pav Bhaji" },
+                            Saturday: { lunch: "Special Thali", dinner: "Biryani (Veg/Non-veg)" },
+                            Sunday: { lunch: "Mutton Thali / Paneer Thali", dinner: "Light Dinner" }
+                          };
+                          setMessForm({ ...messForm, weekly_menu: defaultMenu });
+                          toast({ title: "Weekly Menu pre-populated ✓" });
+                        }}
+                        className="h-8 text-xs px-3"
+                      >
+                        <UtensilsCrossed className="w-3.5 h-3.5 mr-1.5 text-primary" />
+                        Load Standard Menu Template
+                      </Button>
+                    </div>
+
+                    <div className="space-y-3 max-h-[380px] overflow-y-auto pr-1 border rounded-xl p-3 bg-muted/20">
+                      {["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"].map((day) => {
+                        const dayMenu = (() => {
+                          if (!messForm.weekly_menu) return { lunch: "", dinner: "" };
+                          const menu = typeof messForm.weekly_menu === 'string'
+                            ? JSON.parse(messForm.weekly_menu)
+                            : messForm.weekly_menu;
+                          return menu[day] || { lunch: "", dinner: "" };
+                        })();
+
+                        return (
+                          <div key={day} className="grid grid-cols-1 md:grid-cols-3 gap-2 items-center p-2.5 bg-card rounded-lg border">
+                            <span className="font-semibold text-sm text-foreground">{day}</span>
+                            <div>
+                              <Label className="text-[10px] text-muted-foreground uppercase font-bold">Lunch</Label>
+                              <Input
+                                placeholder="e.g. Varan Bhaat, Bhaji, Chapati"
+                                value={dayMenu.lunch || ""}
+                                onChange={(e) => {
+                                  const currentMenu = (() => {
+                                    if (!messForm.weekly_menu) return {};
+                                    return typeof messForm.weekly_menu === 'string'
+                                      ? JSON.parse(messForm.weekly_menu)
+                                      : { ...messForm.weekly_menu };
+                                  })();
+                                  currentMenu[day] = {
+                                    ...currentMenu[day],
+                                    lunch: e.target.value
+                                  };
+                                  setMessForm({ ...messForm, weekly_menu: currentMenu });
+                                }}
+                                className="h-8 text-xs text-foreground bg-background mt-0.5"
+                              />
+                            </div>
+                            <div>
+                              <Label className="text-[10px] text-muted-foreground uppercase font-bold">Dinner</Label>
+                              <Input
+                                placeholder="e.g. Misal Pav, Buttermilk"
+                                value={dayMenu.dinner || ""}
+                                onChange={(e) => {
+                                  const currentMenu = (() => {
+                                    if (!messForm.weekly_menu) return {};
+                                    return typeof messForm.weekly_menu === 'string'
+                                      ? JSON.parse(messForm.weekly_menu)
+                                      : { ...messForm.weekly_menu };
+                                  })();
+                                  currentMenu[day] = {
+                                    ...currentMenu[day],
+                                    dinner: e.target.value
+                                  };
+                                  setMessForm({ ...messForm, weekly_menu: currentMenu });
+                                }}
+                                className="h-8 text-xs text-foreground bg-background mt-0.5"
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
                   {/* Submit */}
                   <Button
                     onClick={handleSaveMess}
@@ -1072,9 +2068,1297 @@ const OwnerDashboard = () => {
                 </div>
               </div>
             </TabsContent>
+
+            <TabsContent value="moderation">
+              <div className="space-y-6 text-foreground text-left">
+                {/* Stats Summary cards */}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div
+                    onClick={() => setActiveModSubTab("users")}
+                    className="bg-card p-5 rounded-2xl shadow-card border flex items-center justify-between cursor-pointer hover:border-primary/50 transition-all"
+                  >
+                    <div>
+                      <p className="text-xs text-muted-foreground uppercase font-semibold">Total Revenue</p>
+                      <h3 className="font-heading font-bold text-2xl text-primary mt-1">₹{(roomBookings.reduce((sum, b) => sum + (b.amount || 0), 0) + subscriptions.reduce((sum, s) => sum + (s.amount || 0), 0)).toLocaleString()}</h3>
+                    </div>
+                    <div className="p-3 bg-primary/10 rounded-full text-primary">
+                      <Coins className="w-6 h-6" />
+                    </div>
+                  </div>
+                  <div
+                    onClick={() => setActiveModSubTab("users")}
+                    className="bg-card p-5 rounded-2xl shadow-card border flex items-center justify-between cursor-pointer hover:border-blue-500/50 transition-all"
+                  >
+                    <div>
+                      <p className="text-xs text-muted-foreground uppercase font-semibold">Total Customers</p>
+                      <h3 className="font-heading font-bold text-2xl text-foreground mt-1">{getUniqueCustomers().length}</h3>
+                    </div>
+                    <div className="p-3 bg-blue-100 dark:bg-blue-950/20 rounded-full text-blue-500">
+                      <Users className="w-6 h-6" />
+                    </div>
+                  </div>
+                  <div
+                    onClick={() => {
+                      setActiveModSubTab("reviews");
+                      setShowCustomerReviewsModal(true);
+                    }}
+                    className="bg-card p-5 rounded-2xl shadow-card border flex items-center justify-between cursor-pointer hover:border-amber-500/50 hover:bg-amber-500/5 transition-all group"
+                    title="Click to view total customer reviews"
+                  >
+                    <div>
+                      <p className="text-xs text-muted-foreground uppercase font-semibold group-hover:text-amber-500 transition-colors">Total Customer Reviews</p>
+                      <h3 className="font-heading font-bold text-2xl text-foreground mt-1 flex items-center gap-1.5">
+                        {reviews.filter(r => myRooms.some(room => room.id === r.listing_id) || myMess.some(m => m.id === r.listing_id)).length}
+                        <span className="text-xs text-amber-600 dark:text-amber-400 font-normal group-hover:underline ml-1">View All &rarr;</span>
+                      </h3>
+                    </div>
+                    <div className="p-3 bg-amber-100 dark:bg-amber-950/20 rounded-full text-amber-500 group-hover:scale-110 transition-transform">
+                      <MessageSquare className="w-6 h-6" />
+                    </div>
+                  </div>
+                  <div
+                    onClick={() => setActiveModSubTab("users")}
+                    className="bg-card p-5 rounded-2xl shadow-card border flex items-center justify-between cursor-pointer hover:border-red-500/50 transition-all"
+                  >
+                    <div>
+                      <p className="text-xs text-muted-foreground uppercase font-semibold">Blocked Users</p>
+                      <h3 className="font-heading font-bold text-2xl text-foreground mt-1">{blockedUsers.length}</h3>
+                    </div>
+                    <div className="p-3 bg-red-100 dark:bg-red-950/20 rounded-full text-red-500">
+                      <Ban className="w-6 h-6" />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Sub navigation buttons */}
+                <div className="flex gap-2 border-b pb-2">
+                  <Button 
+                    variant={activeModSubTab === "users" ? "default" : "ghost"} 
+                    onClick={() => setActiveModSubTab("users")}
+                    className="gap-2"
+                  >
+                    <Users className="w-4 h-4" />
+                    Customers & Bookings
+                  </Button>
+                  <Button 
+                    variant={activeModSubTab === "reviews" ? "default" : "ghost"} 
+                    onClick={() => setActiveModSubTab("reviews")}
+                    className="gap-2"
+                  >
+                    <MessageSquare className="w-4 h-4" />
+                    Reviews Control
+                  </Button>
+                  <Button 
+                    variant={activeModSubTab === "reports" ? "default" : "ghost"} 
+                    onClick={() => setActiveModSubTab("reports")}
+                    className="gap-2"
+                  >
+                    <AlertTriangle className="w-4 h-4" />
+                    Reports & Logs
+                  </Button>
+                </div>
+
+                {/* Sub tabs content */}
+                {activeModSubTab === "users" && (
+                  <div className="bg-card p-6 rounded-2xl shadow-card border">
+                    <h3 className="font-heading font-semibold text-lg mb-4">Customer Directory</h3>
+                    {getUniqueCustomers().length === 0 ? (
+                      <p className="text-sm text-muted-foreground italic text-center py-6">No enquired or booked customers found.</p>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm text-left text-muted-foreground">
+                          <thead className="text-xs text-foreground uppercase bg-muted/50 rounded-lg">
+                            <tr>
+                              <th className="px-6 py-3">Customer Name</th>
+                              <th className="px-6 py-3">Contact</th>
+                              <th className="px-6 py-3">Bookings</th>
+                              <th className="px-6 py-3">Total Paid</th>
+                              <th className="px-6 py-3">Blocked Status</th>
+                              <th className="px-6 py-3 text-right">Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {getUniqueCustomers().map((cust) => {
+                              const isBlocked = blockedUsers.includes(cust.id);
+                              return (
+                                <tr key={cust.id} className="border-b hover:bg-muted/20">
+                                  <td className="px-6 py-4 font-medium text-foreground">{cust.name}</td>
+                                  <td className="px-6 py-4">
+                                    <div className="text-xs">
+                                      <p>{cust.email}</p>
+                                      <p>{cust.phone}</p>
+                                    </div>
+                                  </td>
+                                  <td className="px-6 py-4">{cust.bookings.length} active</td>
+                                  <td className="px-6 py-4 font-bold text-foreground">₹{cust.totalPaid.toLocaleString()}</td>
+                                  <td className="px-6 py-4">
+                                    <Badge variant={isBlocked ? "destructive" : "secondary"}>
+                                      {isBlocked ? "Blocked" : "Active"}
+                                    </Badge>
+                                  </td>
+                                  <td className="px-6 py-4 text-right space-x-2">
+                                    <Button size="sm" variant="outline" onClick={() => setSelectedUserHistory(cust)}>
+                                      <FileText className="w-3.5 h-3.5 mr-1" />
+                                      History
+                                    </Button>
+                                    <Button 
+                                      size="sm" 
+                                      variant={isBlocked ? "outline" : "destructive"} 
+                                      onClick={() => handleToggleBlock(cust.id)}
+                                    >
+                                      {isBlocked ? <UserCheck className="w-3.5 h-3.5 mr-1" /> : <Ban className="w-3.5 h-3.5 mr-1" />}
+                                      {isBlocked ? "Unblock" : "Block"}
+                                    </Button>
+                                    <Button size="sm" variant="ghost" className="text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20" onClick={() => setReportingUser(cust)}>
+                                      <AlertTriangle className="w-3.5 h-3.5 mr-1" />
+                                      Report
+                                    </Button>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {activeModSubTab === "reviews" && (
+                  <div className="bg-card p-6 rounded-2xl shadow-card border space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b pb-4 gap-4">
+                      <div>
+                        <h3 className="font-heading font-semibold text-lg">Reviews on Your Listings</h3>
+                        <p className="text-xs text-muted-foreground mt-0.5">Manage and respond to customer reviews for your rooms and mess listings</p>
+                      </div>
+                      <div className="flex items-center gap-2 bg-muted p-1 rounded-xl">
+                        <Button
+                          variant={reviewListingTypeFilter === "all" ? "default" : "ghost"}
+                          size="sm"
+                          className="h-8 text-xs font-medium px-3 rounded-lg"
+                          onClick={() => setReviewListingTypeFilter("all")}
+                        >
+                          All ({reviews.filter(r => myRooms.some(room => room.id === r.listing_id) || myMess.some(m => m.id === r.listing_id)).length})
+                        </Button>
+                        <Button
+                          variant={reviewListingTypeFilter === "room" ? "default" : "ghost"}
+                          size="sm"
+                          className="h-8 text-xs font-medium px-3 rounded-lg gap-1"
+                          onClick={() => setReviewListingTypeFilter("room")}
+                        >
+                          <Building2 className="w-3.5 h-3.5 text-blue-500" />
+                          Rooms ({reviews.filter(r => myRooms.some(room => room.id === r.listing_id)).length})
+                        </Button>
+                        <Button
+                          variant={reviewListingTypeFilter === "mess" ? "default" : "ghost"}
+                          size="sm"
+                          className="h-8 text-xs font-medium px-3 rounded-lg gap-1"
+                          onClick={() => setReviewListingTypeFilter("mess")}
+                        >
+                          <UtensilsCrossed className="w-3.5 h-3.5 text-amber-500" />
+                          Mess ({reviews.filter(r => myMess.some(m => m.id === r.listing_id)).length})
+                        </Button>
+                      </div>
+                    </div>
+
+                    {(() => {
+                      const allOwnerReviews = reviews.filter(r => myRooms.some(room => room.id === r.listing_id) || myMess.some(m => m.id === r.listing_id));
+                      const filteredReviews = allOwnerReviews.filter(r => {
+                        const isRoom = myRooms.some(room => room.id === r.listing_id);
+                        const isMess = myMess.some(m => m.id === r.listing_id);
+                        if (reviewListingTypeFilter === "room") return isRoom;
+                        if (reviewListingTypeFilter === "mess") return isMess;
+                        return true;
+                      });
+
+                      if (filteredReviews.length === 0) {
+                        return <p className="text-sm text-muted-foreground italic text-center py-6">No reviews found for this filter.</p>;
+                      }
+                      return (
+                        <div className="space-y-6">
+                          {filteredReviews.map((rev) => {
+                            const room = myRooms.find(r => r.id === rev.listing_id);
+                            const mess = myMess.find(m => m.id === rev.listing_id);
+                            const title = room ? `Room: "${room.title}"` : mess ? `Mess: "${mess.name}"` : "Unknown Listing";
+                            return (
+                              <div key={rev.id} className="p-4 bg-muted/30 rounded-xl border space-y-3">
+                                <div className="flex justify-between items-start">
+                                  <div>
+                                    <span className="text-[10px] text-primary uppercase font-bold tracking-wider">{title}</span>
+                                    <h4 className="font-semibold text-sm mt-0.5">Rating: {rev.rating}★</h4>
+                                    <p className="text-xs text-muted-foreground mt-0.5">Reviewed on: {new Date(rev.created_at).toLocaleDateString()}</p>
+                                  </div>
+                                  <Badge variant={rev.status === "flagged" ? "destructive" : "secondary"}>
+                                    {rev.status}
+                                  </Badge>
+                                </div>
+                                <p className="text-sm text-foreground italic">"{rev.comment}"</p>
+                                
+                                {/* Owner reply display / input */}
+                                <div className="pl-4 border-l-2 border-primary/20 space-y-2">
+                                  {rev.owner_reply ? (
+                                    <div className="bg-muted/80 p-3 rounded border border-border flex justify-between items-start">
+                                      <div>
+                                        <p className="font-bold text-xs text-primary">Your Response:</p>
+                                        <p className="text-xs text-foreground italic mt-1">"{rev.owner_reply}"</p>
+                                        {rev.owner_replied_at && (
+                                          <p className="text-[9px] text-muted-foreground mt-1">Replied on: {new Date(rev.owner_replied_at).toLocaleDateString()}</p>
+                                        )}
+                                      </div>
+                                      <div className="flex gap-2">
+                                        <Button size="sm" variant="ghost" className="h-6 text-xs text-primary" onClick={() => {
+                                          setSelectedReviewForReply(rev.id);
+                                          setReplyText(rev.owner_reply || "");
+                                        }}>
+                                          <Edit className="w-3 h-3 mr-1" />
+                                          Edit
+                                        </Button>
+                                        <Button size="sm" variant="ghost" className="h-6 text-xs text-destructive" onClick={() => handleReplyDelete(rev.id)}>
+                                          <Trash2 className="w-3 h-3 mr-1" />
+                                          Delete
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    selectedReviewForReply === rev.id ? (
+                                      <div className="space-y-2">
+                                        <Textarea
+                                          value={replyText}
+                                          onChange={(e) => setReplyText(e.target.value)}
+                                          placeholder="Type your response to this customer..."
+                                          className="text-xs text-foreground bg-background"
+                                        />
+                                        <div className="flex justify-end gap-2">
+                                          <Button size="sm" variant="outline" onClick={() => {
+                                            setSelectedReviewForReply(null);
+                                            setReplyText("");
+                                          }}>
+                                            Cancel
+                                          </Button>
+                                          <Button size="sm" onClick={() => handleReplySubmit(rev.id)} disabled={submittingReply}>
+                                            {submittingReply ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Check className="w-3 h-3 mr-1" />}
+                                            Post Response
+                                          </Button>
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <Button size="sm" variant="outline" onClick={() => setSelectedReviewForReply(rev.id)}>
+                                        <MessageSquare className="w-3.5 h-3.5 mr-1" />
+                                        Write Response
+                                      </Button>
+                                    )
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    })()}
+                  </div>
+                )}
+
+                {activeModSubTab === "reports" && (
+                  <div className="bg-card p-6 rounded-2xl shadow-card border">
+                    <h3 className="font-heading font-semibold text-lg mb-4">Report Logs</h3>
+                    {(() => {
+                      const filteredReports = reports.filter(r => 
+                        r.reporter_id === user.id || 
+                        (r.target_type === "listing" && (myRooms.some(room => room.id === r.target_id) || myMess.some(m => m.id === r.target_id)))
+                      );
+                      if (filteredReports.length === 0) {
+                        return <p className="text-sm text-muted-foreground italic text-center py-6">No reports filed or received.</p>;
+                      }
+                      return (
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-sm text-left text-muted-foreground">
+                            <thead className="text-xs text-foreground uppercase bg-muted/50">
+                              <tr>
+                                <th className="px-6 py-3">Report Date</th>
+                                <th className="px-6 py-3">Type</th>
+                                <th className="px-6 py-3">Reason</th>
+                                <th className="px-6 py-3">Direction</th>
+                                <th className="px-6 py-3">Status</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {filteredReports.map((rep) => {
+                                const isFiledByMe = rep.reporter_id === user.id;
+                                return (
+                                  <tr key={rep.id} className="border-b hover:bg-muted/20">
+                                    <td className="px-6 py-4">{new Date(rep.created_at).toLocaleDateString()}</td>
+                                    <td className="px-6 py-4 uppercase font-semibold text-foreground text-xs">{rep.target_type}</td>
+                                    <td className="px-6 py-4 italic text-foreground text-sm">"{rep.reason}"</td>
+                                    <td className="px-6 py-4 text-xs">
+                                      <Badge variant={isFiledByMe ? "default" : "outline"}>
+                                        {isFiledByMe ? "Filed by Me" : "Received"}
+                                      </Badge>
+                                    </td>
+                                    <td className="px-6 py-4">
+                                      <Badge className={rep.status === "open" ? "bg-amber-600 text-white" : "bg-success text-white"}>
+                                        {rep.status}
+                                      </Badge>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                )}
+              </div>
+            </TabsContent>
           </Tabs>
         </div>
       </main>
+
+      {/* Edit Room Modal */}
+      {editingRoom && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-card rounded-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl border text-foreground">
+            <div className="flex items-center justify-between mb-6 pb-2 border-b">
+              <h3 className="font-heading font-semibold text-xl">Edit Room Listing</h3>
+              <Button variant="ghost" size="icon" onClick={() => setEditingRoom(null)}>
+                <X className="w-5 h-5" />
+              </Button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="edit-room-title">Room Title *</Label>
+                <Input
+                  id="edit-room-title"
+                  value={editingRoom.title}
+                  onChange={(e) => setEditingRoom({ ...editingRoom, title: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="edit-room-desc">Description</Label>
+                <Textarea
+                  id="edit-room-desc"
+                  value={editingRoom.description || ""}
+                  onChange={(e) => setEditingRoom({ ...editingRoom, description: e.target.value })}
+                  rows={3}
+                />
+              </div>
+
+              <div className="grid md:grid-cols-3 gap-4">
+                <div>
+                  <Label htmlFor="edit-room-loc">Area / Landmark *</Label>
+                  <Input
+                    id="edit-room-loc"
+                    value={editingRoom.location}
+                    onChange={(e) => setEditingRoom({ ...editingRoom, location: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="edit-room-addr">Address *</Label>
+                  <Input
+                    id="edit-room-addr"
+                    value={editingRoom.address || ""}
+                    onChange={(e) => setEditingRoom({ ...editingRoom, address: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="edit-room-city">City *</Label>
+                  <Input
+                    id="edit-room-city"
+                    value={editingRoom.city || ""}
+                    onChange={(e) => setEditingRoom({ ...editingRoom, city: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              {/* Geocode & Location Coordinates Section */}
+              <div className="space-y-3 p-4 bg-muted/20 border rounded-xl">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div>
+                    <Label className="text-sm font-semibold block text-foreground">Property Map Coordinates</Label>
+                    <p className="text-xs text-muted-foreground">Geocode from typed address or use your live device GPS location</p>
+                  </div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={geocodeEditingRoomAddress}
+                      disabled={geocodingRoom}
+                      className="h-8 text-xs gap-1.5"
+                    >
+                      {geocodingRoom ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <MapPin className="w-3.5 h-3.5 text-primary" />
+                      )}
+                      Get Location Coordinates
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      onClick={useCurrentDeviceLocationForEditingRoom}
+                      disabled={geocodingRoom}
+                      className="h-8 text-xs gap-1.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/30"
+                    >
+                      <Navigation className="w-3.5 h-3.5" />
+                      Use Live GPS Location
+                    </Button>
+                  </div>
+                </div>
+
+                {editingRoom.latitude && editingRoom.longitude && (
+                  <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg flex items-center justify-between text-xs text-foreground">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle className="w-4 h-4 text-emerald-500 shrink-0" />
+                      <div>
+                        <span className="font-semibold text-emerald-600 dark:text-emerald-400">Location Coordinates Marked ✓</span>
+                        <p className="text-[11px] text-muted-foreground font-mono">
+                          Latitude: {editingRoom.latitude.toFixed(4)}, Longitude: {editingRoom.longitude.toFixed(4)}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <a
+                        href={`https://www.openstreetmap.org/?mlat=${editingRoom.latitude}&mlon=${editingRoom.longitude}#map=16/${editingRoom.latitude}/${editingRoom.longitude}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-primary hover:underline font-medium flex items-center gap-1 text-[11px]"
+                      >
+                        <ExternalLink className="w-3 h-3" />
+                        View Map
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() => setEditingRoom({ ...editingRoom, latitude: undefined, longitude: undefined })}
+                        className="text-destructive hover:underline text-[11px]"
+                      >
+                        Clear
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="grid md:grid-cols-3 gap-4">
+                <div>
+                  <Label htmlFor="edit-room-price">Monthly Price (₹) *</Label>
+                  <Input
+                    id="edit-room-price"
+                    type="number"
+                    value={editingRoom.price}
+                    onChange={(e) => setEditingRoom({ ...editingRoom, price: Number(e.target.value) })}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="edit-room-deposit">Deposit (₹)</Label>
+                  <Input
+                    id="edit-room-deposit"
+                    type="number"
+                    value={editingRoom.deposit || ""}
+                    onChange={(e) => setEditingRoom({ ...editingRoom, deposit: Number(e.target.value) })}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="edit-room-type">Room Type *</Label>
+                  <select
+                    id="edit-room-type"
+                    value={editingRoom.room_type}
+                    onChange={(e) => setEditingRoom({ ...editingRoom, room_type: e.target.value })}
+                    className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm text-foreground"
+                  >
+                    <option value="Single">Single</option>
+                    <option value="Shared">Shared</option>
+                    <option value="Double">Double</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="edit-room-tenants">Preferred Tenants</Label>
+                  <Input
+                    id="edit-room-tenants"
+                    value={editingRoom.preferred_tenants || ""}
+                    onChange={(e) => setEditingRoom({ ...editingRoom, preferred_tenants: e.target.value })}
+                    placeholder="e.g. Students / Employees"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="edit-room-avail">Available From</Label>
+                  <Input
+                    id="edit-room-avail"
+                    type="date"
+                    value={editingRoom.available_from || ""}
+                    onChange={(e) => setEditingRoom({ ...editingRoom, available_from: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="edit-room-rules">Rules</Label>
+                <Input
+                  id="edit-room-rules"
+                  value={editingRoom.rules || ""}
+                  onChange={(e) => setEditingRoom({ ...editingRoom, rules: e.target.value })}
+                  placeholder="e.g. No smoking, No pets"
+                />
+              </div>
+
+              <div>
+                <Label className="mb-2 block">Facilities</Label>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                  {facilityOptions.map((facility) => {
+                    const hasFacility = editingRoom.facilities?.includes(facility);
+                    return (
+                      <label key={facility} className="flex items-center gap-2 text-sm cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={hasFacility}
+                          onChange={(e) => {
+                            const newFacilities = e.target.checked
+                              ? [...(editingRoom.facilities || []), facility]
+                              : (editingRoom.facilities || []).filter(f => f !== facility);
+                            setEditingRoom({ ...editingRoom, facilities: newFacilities });
+                          }}
+                          className="w-4 h-4 rounded border-input text-primary"
+                        />
+                        <span>{facility}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div>
+                <Label className="mb-2 block">Images (URLs)</Label>
+                <div className="grid grid-cols-3 gap-2 mb-2">
+                  {(editingRoom.images || []).map((imgUrl: string, idx: number) => (
+                    <div key={idx} className="relative group aspect-video rounded-lg overflow-hidden border">
+                      <img src={imgUrl} className="w-full h-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newImages = (editingRoom.images || []).filter((_: any, i: number) => i !== idx);
+                          setEditingRoom({ ...editingRoom, images: newImages });
+                        }}
+                        className="absolute top-1 right-1 bg-destructive/80 hover:bg-destructive text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center w-6 h-6"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Paste image URL here"
+                    id="new-room-image-url"
+                    className="flex-1"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        const input = e.currentTarget;
+                        const url = input.value.trim();
+                        if (url) {
+                          setEditingRoom({ ...editingRoom, images: [...(editingRoom.images || []), url] });
+                          input.value = "";
+                        }
+                      }
+                    }}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      const input = document.getElementById("new-room-image-url") as HTMLInputElement;
+                      const url = input?.value.trim();
+                      if (url) {
+                        setEditingRoom({ ...editingRoom, images: [...(editingRoom.images || []), url] });
+                        input.value = "";
+                      }
+                    }}
+                  >
+                    Add
+                  </Button>
+                </div>
+                <div className="flex flex-col gap-2 border p-3 rounded-lg bg-muted/20 mt-3 text-left">
+                  <span className="text-xs font-semibold text-muted-foreground">Upload from Device</span>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="file"
+                      accept="image/*"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          try {
+                            toast({ title: "Uploading image...", description: "Please wait while we upload the image." });
+                            const url = await uploadListingImage(file);
+                            if (url) {
+                              setEditingRoom({ ...editingRoom, images: [...(editingRoom.images || []), url] });
+                              toast({ title: "Image uploaded successfully ✓" });
+                            }
+                          } catch (err: any) {
+                            toast({ title: "Upload failed", description: err.message, variant: "destructive" });
+                          }
+                          e.target.value = "";
+                        }
+                      }}
+                      className="cursor-pointer text-xs"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4 border-t">
+                <Button variant="outline" onClick={() => setEditingRoom(null)}>Cancel</Button>
+                <Button onClick={saveRoom} disabled={saving}>
+                  {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                  Save Changes
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Mess Modal */}
+      {editingMess && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-card rounded-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl border text-foreground">
+            <div className="flex items-center justify-between mb-6 pb-2 border-b">
+              <h3 className="font-heading font-semibold text-xl">Edit Mess Listing</h3>
+              <Button variant="ghost" size="icon" onClick={() => setEditingMess(null)}>
+                <X className="w-5 h-5" />
+              </Button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="edit-mess-name">Mess Name *</Label>
+                <Input
+                  id="edit-mess-name"
+                  value={editingMess.name}
+                  onChange={(e) => setEditingMess({ ...editingMess, name: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="edit-mess-desc">Description</Label>
+                <Textarea
+                  id="edit-mess-desc"
+                  value={editingMess.description || ""}
+                  onChange={(e) => setEditingMess({ ...editingMess, description: e.target.value })}
+                  rows={3}
+                />
+              </div>
+
+              <div className="grid md:grid-cols-3 gap-4">
+                <div>
+                  <Label htmlFor="edit-mess-loc">Area / Landmark *</Label>
+                  <Input
+                    id="edit-mess-loc"
+                    value={editingMess.location}
+                    onChange={(e) => setEditingMess({ ...editingMess, location: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="edit-mess-addr">Address *</Label>
+                  <Input
+                    id="edit-mess-addr"
+                    value={editingMess.address || ""}
+                    onChange={(e) => setEditingMess({ ...editingMess, address: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="edit-mess-city">City *</Label>
+                  <Input
+                    id="edit-mess-city"
+                    value={editingMess.city || ""}
+                    onChange={(e) => setEditingMess({ ...editingMess, city: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              {/* Geocode & Location Coordinates Section */}
+              <div className="space-y-3 p-4 bg-muted/20 border rounded-xl">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div>
+                    <Label className="text-sm font-semibold block text-foreground">Mess Map Coordinates</Label>
+                    <p className="text-xs text-muted-foreground">Geocode from typed address or use your live device GPS location</p>
+                  </div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={geocodeEditingMessAddress}
+                      disabled={geocodingMess}
+                      className="h-8 text-xs gap-1.5"
+                    >
+                      {geocodingMess ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <MapPin className="w-3.5 h-3.5 text-primary" />
+                      )}
+                      Get Location Coordinates
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      onClick={useCurrentDeviceLocationForEditingMess}
+                      disabled={geocodingMess}
+                      className="h-8 text-xs gap-1.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/30"
+                    >
+                      <Navigation className="w-3.5 h-3.5" />
+                      Use Live GPS Location
+                    </Button>
+                  </div>
+                </div>
+
+                {editingMess.latitude && editingMess.longitude && (
+                  <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg flex items-center justify-between text-xs text-foreground">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle className="w-4 h-4 text-emerald-500 shrink-0" />
+                      <div>
+                        <span className="font-semibold text-emerald-600 dark:text-emerald-400">Location Coordinates Marked ✓</span>
+                        <p className="text-[11px] text-muted-foreground font-mono">
+                          Latitude: {editingMess.latitude.toFixed(4)}, Longitude: {editingMess.longitude.toFixed(4)}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <a
+                        href={`https://www.openstreetmap.org/?mlat=${editingMess.latitude}&mlon=${editingMess.longitude}#map=16/${editingMess.latitude}/${editingMess.longitude}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-primary hover:underline font-medium flex items-center gap-1 text-[11px]"
+                      >
+                        <ExternalLink className="w-3 h-3" />
+                        View Map
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() => setEditingMess({ ...editingMess, latitude: undefined, longitude: undefined })}
+                        className="text-destructive hover:underline text-[11px]"
+                      >
+                        Clear
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="grid md:grid-cols-3 gap-4">
+                <div>
+                  <Label htmlFor="edit-mess-price">Monthly Price (₹) *</Label>
+                  <Input
+                    id="edit-mess-price"
+                    type="number"
+                    value={editingMess.price_per_month}
+                    onChange={(e) => setEditingMess({ ...editingMess, price_per_month: Number(e.target.value) })}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="edit-mess-food">Food Type *</Label>
+                  <select
+                    id="edit-mess-food"
+                    value={editingMess.food_type}
+                    onChange={(e) => setEditingMess({ ...editingMess, food_type: e.target.value as any })}
+                    className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm text-foreground"
+                  >
+                    <option value="veg">Veg</option>
+                    <option value="non-veg">Non-Veg</option>
+                    <option value="both">Both</option>
+                  </select>
+                </div>
+                <div>
+                  <Label htmlFor="edit-mess-timings">Timings</Label>
+                  <Input
+                    id="edit-mess-timings"
+                    value={editingMess.timings || ""}
+                    onChange={(e) => setEditingMess({ ...editingMess, timings: e.target.value })}
+                    placeholder="e.g. 7AM - 10PM"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="edit-mess-menu">Menu Highlights (comma separated)</Label>
+                <Input
+                  id="edit-mess-menu"
+                  value={Array.isArray(editingMess.menu_highlights) ? editingMess.menu_highlights.join(", ") : editingMess.menu_highlights || ""}
+                  onChange={(e) => setEditingMess({ ...editingMess, menu_highlights: e.target.value as any })}
+                  placeholder="e.g. Misal Pav, Thali, Tambda Rassa"
+                />
+              </div>
+
+              <div>
+                <Label className="mb-2 block">Images (URLs)</Label>
+                <div className="grid grid-cols-3 gap-2 mb-2">
+                  {(editingMess.images || []).map((imgUrl: string, idx: number) => (
+                    <div key={idx} className="relative group aspect-video rounded-lg overflow-hidden border">
+                      <img src={imgUrl} className="w-full h-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newImages = (editingMess.images || []).filter((_: any, i: number) => i !== idx);
+                          setEditingMess({ ...editingMess, images: newImages });
+                        }}
+                        className="absolute top-1 right-1 bg-destructive/80 hover:bg-destructive text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center w-6 h-6"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Paste image URL here"
+                    id="new-mess-image-url"
+                    className="flex-1"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        const input = e.currentTarget;
+                        const url = input.value.trim();
+                        if (url) {
+                          setEditingMess({ ...editingMess, images: [...(editingMess.images || []), url] });
+                          input.value = "";
+                        }
+                      }
+                    }}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      const input = document.getElementById("new-mess-image-url") as HTMLInputElement;
+                      const url = input?.value.trim();
+                      if (url) {
+                        setEditingMess({ ...editingMess, images: [...(editingMess.images || []), url] });
+                        input.value = "";
+                      }
+                    }}
+                  >
+                    Add
+                  </Button>
+                </div>
+                <div className="flex flex-col gap-2 border p-3 rounded-lg bg-muted/20 mt-3 text-left">
+                  <span className="text-xs font-semibold text-muted-foreground">Upload from Device</span>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="file"
+                      accept="image/*"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          try {
+                            toast({ title: "Uploading image...", description: "Please wait while we upload the image." });
+                            const url = await uploadListingImage(file);
+                            if (url) {
+                              setEditingMess({ ...editingMess, images: [...(editingMess.images || []), url] });
+                              toast({ title: "Image uploaded successfully ✓" });
+                            }
+                          } catch (err: any) {
+                            toast({ title: "Upload failed", description: err.message, variant: "destructive" });
+                          }
+                          e.target.value = "";
+                        }
+                      }}
+                      className="cursor-pointer text-xs"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-2 border-b pb-1">
+                  <Label className="font-semibold text-base">Weekly Menu (Lunch & Dinner)</Label>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      const defaultMenu = {
+                        Monday: { lunch: "Varan Bhaat, Bhaji, Chapati, Salad", dinner: "Misal Pav, Buttermilk" },
+                        Tuesday: { lunch: "Usal, Rice, Chapati, Papad", dinner: "Dal Khichdi, Kadhi" },
+                        Wednesday: { lunch: "Tambda Rassa, Rice, Bhakri", dinner: "Veg Pulao, Raita" },
+                        Thursday: { lunch: "Matki Usal, Chapati, Rice", dinner: "Chole Bhature" },
+                        Friday: { lunch: "Pandhra Rassa, Rice, Bhakri", dinner: "Pav Bhaji" },
+                        Saturday: { lunch: "Special Thali", dinner: "Biryani (Veg/Non-veg)" },
+                        Sunday: { lunch: "Mutton Thali / Paneer Thali", dinner: "Light Dinner" }
+                      };
+                      setEditingMess({ ...editingMess, weekly_menu: defaultMenu });
+                      toast({ title: "Weekly Menu pre-populated ✓" });
+                    }}
+                    className="h-7 text-xs px-2"
+                  >
+                    Load Standard Menu Template
+                  </Button>
+                </div>
+                <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2">
+                  {["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"].map((day) => {
+                    const dayMenu = (() => {
+                      if (!editingMess.weekly_menu) return { lunch: "", dinner: "" };
+                      const menu = typeof editingMess.weekly_menu === 'string'
+                        ? JSON.parse(editingMess.weekly_menu)
+                        : editingMess.weekly_menu;
+                      return menu[day] || { lunch: "", dinner: "" };
+                    })();
+
+                    return (
+                      <div key={day} className="grid grid-cols-1 md:grid-cols-3 gap-2 items-center p-2 bg-muted/50 rounded-lg">
+                        <span className="font-medium text-sm text-foreground">{day}</span>
+                        <div>
+                          <Label className="text-[10px] text-muted-foreground uppercase">Lunch</Label>
+                          <Input
+                            placeholder="e.g. Rice, Dal, Veg Sabji"
+                            value={dayMenu.lunch || ""}
+                            onChange={(e) => {
+                              const currentMenu = (() => {
+                                if (!editingMess.weekly_menu) return {};
+                                return typeof editingMess.weekly_menu === 'string'
+                                  ? JSON.parse(editingMess.weekly_menu)
+                                  : { ...editingMess.weekly_menu };
+                              })();
+                              currentMenu[day] = {
+                                ...currentMenu[day],
+                                lunch: e.target.value
+                              };
+                              setEditingMess({ ...editingMess, weekly_menu: currentMenu });
+                            }}
+                            className="h-8 text-xs text-foreground bg-background"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-[10px] text-muted-foreground uppercase">Dinner</Label>
+                          <Input
+                            placeholder="e.g. Chapati, Paneer Masala"
+                            value={dayMenu.dinner || ""}
+                            onChange={(e) => {
+                              const currentMenu = (() => {
+                                if (!editingMess.weekly_menu) return {};
+                                return typeof editingMess.weekly_menu === 'string'
+                                  ? JSON.parse(editingMess.weekly_menu)
+                                  : { ...editingMess.weekly_menu };
+                              })();
+                              currentMenu[day] = {
+                                ...currentMenu[day],
+                                dinner: e.target.value
+                              };
+                              setEditingMess({ ...editingMess, weekly_menu: currentMenu });
+                            }}
+                            className="h-8 text-xs text-foreground bg-background"
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4 border-t">
+                <Button variant="outline" onClick={() => setEditingMess(null)}>Cancel</Button>
+                <Button onClick={saveMess} disabled={saving}>
+                  {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                  Save Changes
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {promotingListing && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-card rounded-2xl p-6 w-full max-w-md text-center border">
+            <div className="w-12 h-12 rounded-full bg-amber-100 dark:bg-amber-950/20 flex items-center justify-center mx-auto mb-4">
+              <Sparkles className="w-6 h-6 text-amber-500 animate-pulse" />
+            </div>
+            <h3 className="font-heading font-semibold text-xl mb-2">Promote Your Listing</h3>
+            <p className="text-sm text-muted-foreground mb-6">
+              Feature <strong>"{promotingListing.title}"</strong> at the top of search results and home screen for 30 days to get 5x more enquiries!
+            </p>
+            <div className="bg-muted p-3 rounded-lg mb-6 text-sm flex justify-between items-center">
+              <span className="text-muted-foreground">Promotion Charge:</span>
+              <span className="font-bold text-lg text-primary">₹{featuredListingPrice}</span>
+            </div>
+            <div className="flex gap-3 justify-center">
+              <Button variant="outline" onClick={() => setPromotingListing(null)} disabled={promoting}>
+                Cancel
+              </Button>
+              <Button onClick={handlePromoteListing} disabled={promoting} className="bg-amber-500 hover:bg-amber-600 text-white gap-2">
+                {promoting ? <Loader2 className="w-4 h-4 animate-spin" /> : <CreditCard className="w-4 h-4" />}
+                Pay & Feature Now
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {selectedUserHistory && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 text-foreground text-left">
+          <div className="bg-card rounded-2xl p-6 w-full max-w-lg shadow-2xl border">
+            <div className="flex items-center justify-between mb-4 pb-2 border-b">
+              <h3 className="font-heading font-semibold text-lg">Booking History: {selectedUserHistory.name}</h3>
+              <Button variant="ghost" size="icon" onClick={() => setSelectedUserHistory(null)}>
+                <X className="w-5 h-5" />
+              </Button>
+            </div>
+            <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
+              <div>
+                <p className="text-xs text-muted-foreground uppercase font-bold">Contact Info</p>
+                <p className="text-sm mt-0.5">Email: {selectedUserHistory.email}</p>
+                <p className="text-sm">Phone: {selectedUserHistory.phone}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground uppercase font-bold mb-2">Bookings & Payments</p>
+                <div className="space-y-2">
+                  {selectedUserHistory.bookings.map((booking: any) => (
+                    <div key={booking.id} className="p-3 bg-muted/50 rounded-lg border flex justify-between items-center text-xs">
+                      <div>
+                        <p className="font-semibold text-sm text-foreground">{booking.title}</p>
+                        <p className="text-muted-foreground mt-0.5">Type: <span className="uppercase font-semibold">{booking.type}</span></p>
+                        <p className="text-muted-foreground mt-0.5">Date: {new Date(booking.date).toLocaleDateString()}</p>
+                        <Badge className="mt-1" variant={booking.status === "active" || booking.status === "confirmed" ? "secondary" : "default"}>
+                          {booking.status}
+                        </Badge>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-muted-foreground text-[10px]">Amount Paid</p>
+                        <p className="font-bold text-primary text-sm mt-0.5">₹{booking.amount.toLocaleString()}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div className="flex justify-end pt-4 border-t mt-4">
+              <Button onClick={() => setSelectedUserHistory(null)}>Close</Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {reportingUser && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 text-foreground text-left">
+          <div className="bg-card rounded-2xl p-6 w-full max-w-md shadow-2xl border">
+            <div className="flex items-center justify-between mb-4 pb-2 border-b">
+              <h3 className="font-heading font-semibold text-lg">Report User: {reportingUser.name}</h3>
+              <Button variant="ghost" size="icon" onClick={() => setReportingUser(null)}>
+                <X className="w-5 h-5" />
+              </Button>
+            </div>
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Describe the issue you encountered with this user. Your report will be sent to the administrator panel for review.
+              </p>
+              <div>
+                <Label htmlFor="report-reason">Reason for Report</Label>
+                <Textarea
+                  id="report-reason"
+                  value={reportReason}
+                  onChange={(e) => setReportReason(e.target.value)}
+                  placeholder="e.g. Failure to make payments, violation of listing rules, toxic behaviour..."
+                  rows={4}
+                  className="mt-1 text-sm bg-background text-foreground"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 pt-4 border-t mt-4">
+              <Button variant="outline" onClick={() => setReportingUser(null)}>Cancel</Button>
+              <Button onClick={handleUserReportSubmit} disabled={submittingReport} variant="destructive">
+                {submittingReport ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                Submit Report
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showCustomerReviewsModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 text-foreground text-left">
+          <div className="bg-card rounded-2xl p-6 w-full max-w-3xl shadow-2xl border max-h-[85vh] overflow-y-auto space-y-4">
+            <div className="flex items-center justify-between border-b pb-3">
+              <div>
+                <h3 className="font-heading font-bold text-xl flex items-center gap-2">
+                  <MessageSquare className="w-5 h-5 text-amber-500" />
+                  Total Customer Reviews (Rooms & Mess)
+                </h3>
+                <p className="text-xs text-muted-foreground mt-0.5">Comprehensive review logs submitted by customers for your listings</p>
+              </div>
+              <Button variant="ghost" size="icon" onClick={() => setShowCustomerReviewsModal(false)}>
+                <X className="w-5 h-5" />
+              </Button>
+            </div>
+
+            {(() => {
+              const allOwnerReviews = reviews.filter(r => myRooms.some(room => room.id === r.listing_id) || myMess.some(m => m.id === r.listing_id));
+              const roomReviews = allOwnerReviews.filter(r => myRooms.some(room => room.id === r.listing_id));
+              const messReviews = allOwnerReviews.filter(r => myMess.some(m => m.id === r.listing_id));
+              const avgRating = allOwnerReviews.length > 0 ? (allOwnerReviews.reduce((sum, r) => sum + Number(r.rating || 0), 0) / allOwnerReviews.length).toFixed(1) : "N/A";
+
+              const displayReviews = allOwnerReviews.filter(r => {
+                const isRoom = myRooms.some(room => room.id === r.listing_id);
+                const isMess = myMess.some(m => m.id === r.listing_id);
+                if (reviewListingTypeFilter === "room") return isRoom;
+                if (reviewListingTypeFilter === "mess") return isMess;
+                return true;
+              });
+
+              return (
+                <div className="space-y-4">
+                  {/* Summary Bar */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div className="p-3 bg-muted/40 rounded-xl border">
+                      <p className="text-[10px] text-muted-foreground uppercase font-semibold">Total Reviews</p>
+                      <p className="text-xl font-bold text-foreground mt-0.5">{allOwnerReviews.length}</p>
+                    </div>
+                    <div className="p-3 bg-amber-50 dark:bg-amber-950/20 rounded-xl border border-amber-200/50 dark:border-amber-900/50">
+                      <p className="text-[10px] text-amber-600 dark:text-amber-400 uppercase font-semibold">Average Rating</p>
+                      <p className="text-xl font-bold text-amber-700 dark:text-amber-300 mt-0.5">{avgRating} ★</p>
+                    </div>
+                    <div className="p-3 bg-blue-50 dark:bg-blue-950/20 rounded-xl border border-blue-200/50 dark:border-blue-900/50">
+                      <p className="text-[10px] text-blue-600 dark:text-blue-400 uppercase font-semibold">Room Reviews</p>
+                      <p className="text-xl font-bold text-blue-700 dark:text-blue-300 mt-0.5">{roomReviews.length}</p>
+                    </div>
+                    <div className="p-3 bg-muted/40 rounded-xl border">
+                      <p className="text-[10px] text-muted-foreground uppercase font-semibold">Mess Reviews</p>
+                      <p className="text-xl font-bold text-foreground mt-0.5">{messReviews.length}</p>
+                    </div>
+                  </div>
+
+                  {/* Filter Subtabs */}
+                  <div className="flex items-center gap-2 bg-muted p-1 rounded-xl">
+                    <Button
+                      variant={reviewListingTypeFilter === "all" ? "default" : "ghost"}
+                      size="sm"
+                      className="h-8 text-xs font-medium px-3 rounded-lg"
+                      onClick={() => setReviewListingTypeFilter("all")}
+                    >
+                      All Reviews ({allOwnerReviews.length})
+                    </Button>
+                    <Button
+                      variant={reviewListingTypeFilter === "room" ? "default" : "ghost"}
+                      size="sm"
+                      className="h-8 text-xs font-medium px-3 rounded-lg gap-1"
+                      onClick={() => setReviewListingTypeFilter("room")}
+                    >
+                      <Building2 className="w-3.5 h-3.5 text-blue-500" />
+                      Rooms ({roomReviews.length})
+                    </Button>
+                    <Button
+                      variant={reviewListingTypeFilter === "mess" ? "default" : "ghost"}
+                      size="sm"
+                      className="h-8 text-xs font-medium px-3 rounded-lg gap-1"
+                      onClick={() => setReviewListingTypeFilter("mess")}
+                    >
+                      <UtensilsCrossed className="w-3.5 h-3.5 text-amber-500" />
+                      Mess ({messReviews.length})
+                    </Button>
+                  </div>
+
+                  {/* Reviews List */}
+                  {displayReviews.length === 0 ? (
+                    <div className="text-center py-8 bg-muted/20 rounded-xl border border-dashed">
+                      <p className="text-sm text-muted-foreground italic">No customer reviews found for this selection.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {displayReviews.map((rev) => {
+                        const room = myRooms.find(r => r.id === rev.listing_id);
+                        const mess = myMess.find(m => m.id === rev.listing_id);
+                        const title = room ? `Room: "${room.title}"` : mess ? `Mess: "${mess.name}"` : "Unknown Listing";
+                        return (
+                          <div key={rev.id} className="p-4 bg-muted/30 rounded-xl border space-y-3">
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <span className="text-[10px] text-primary uppercase font-bold tracking-wider">{title}</span>
+                                <h4 className="font-semibold text-sm mt-0.5 text-amber-500">Rating: {rev.rating}★</h4>
+                                <p className="text-xs text-muted-foreground mt-0.5">Reviewed on: {new Date(rev.created_at).toLocaleDateString()}</p>
+                              </div>
+                              <Badge variant={rev.status === "flagged" ? "destructive" : "secondary"}>
+                                {rev.status}
+                              </Badge>
+                            </div>
+                            <p className="text-sm text-foreground italic">"{rev.comment}"</p>
+
+                            {/* Owner Response Display */}
+                            <div className="pl-4 border-l-2 border-primary/20 space-y-2">
+                              {rev.owner_reply ? (
+                                <div className="bg-muted/80 p-3 rounded border border-border flex justify-between items-start">
+                                  <div>
+                                    <p className="font-bold text-xs text-primary">Your Response:</p>
+                                    <p className="text-xs text-foreground italic mt-1">"{rev.owner_reply}"</p>
+                                    {rev.owner_replied_at && (
+                                      <p className="text-[9px] text-muted-foreground mt-1">Replied on: {new Date(rev.owner_replied_at).toLocaleDateString()}</p>
+                                    )}
+                                  </div>
+                                  <div className="flex gap-2">
+                                    <Button size="sm" variant="ghost" className="h-6 text-xs text-primary" onClick={() => {
+                                      setSelectedReviewForReply(rev.id);
+                                      setReplyText(rev.owner_reply || "");
+                                    }}>
+                                      <Edit className="w-3 h-3 mr-1" />
+                                      Edit
+                                    </Button>
+                                    <Button size="sm" variant="ghost" className="h-6 text-xs text-destructive" onClick={() => handleReplyDelete(rev.id)}>
+                                      <Trash2 className="w-3 h-3 mr-1" />
+                                      Delete
+                                    </Button>
+                                  </div>
+                                </div>
+                              ) : (
+                                selectedReviewForReply === rev.id ? (
+                                  <div className="space-y-2">
+                                    <Textarea
+                                      value={replyText}
+                                      onChange={(e) => setReplyText(e.target.value)}
+                                      placeholder="Type your response to this customer..."
+                                      className="text-xs text-foreground bg-background"
+                                    />
+                                    <div className="flex justify-end gap-2">
+                                      <Button size="sm" variant="outline" onClick={() => {
+                                        setSelectedReviewForReply(null);
+                                        setReplyText("");
+                                      }}>
+                                        Cancel
+                                      </Button>
+                                      <Button size="sm" onClick={() => handleReplySubmit(rev.id)} disabled={submittingReply}>
+                                        {submittingReply ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Check className="w-3 h-3 mr-1" />}
+                                        Submit Response
+                                      </Button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <Button size="sm" variant="outline" className="text-xs h-7" onClick={() => {
+                                    setSelectedReviewForReply(rev.id);
+                                    setReplyText("");
+                                  }}>
+                                    <MessageSquare className="w-3 h-3 mr-1" />
+                                    Reply to Customer
+                                  </Button>
+                                )
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
+            <div className="flex justify-end pt-3 border-t">
+              <Button onClick={() => setShowCustomerReviewsModal(false)}>Close</Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <Footer />
     </div>

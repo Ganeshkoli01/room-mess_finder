@@ -72,6 +72,7 @@ const MessListings = () => {
             lng: mess.longitude,
             distance: mess.distance,
             isFromGoogle: false,
+            owner_id: mess.owner_id,
           }));
           setMessList(transformedMess);
         } else {
@@ -187,7 +188,7 @@ const MessListings = () => {
     return filtered;
   }, [messList, googleMess, priceRange, selectedFoodTypes, verifiedOnly, locationFilter, userLocation, dataSource, showGooglePlaces, calculateDistance]);
 
-  const handleSearch = async (query: string) => {
+  const handleSearch = async (query: string, _searchType?: string, _budget?: string, _facilities?: string[]) => {
     setLocationFilter(query);
 
     if (query) {
@@ -209,6 +210,7 @@ const MessListings = () => {
             lat: mess.latitude,
             lng: mess.longitude,
             isFromGoogle: false,
+            owner_id: mess.owner_id,
           }));
           setMessList(transformedMess);
         }
@@ -315,8 +317,9 @@ const MessListings = () => {
         <Slider
           value={priceRange}
           onValueChange={setPriceRange}
-          max={6000}
-          step={200}
+          min={0}
+          max={10000}
+          step={100}
           className="mb-3"
         />
         <div className="flex items-center justify-between text-sm text-muted-foreground">

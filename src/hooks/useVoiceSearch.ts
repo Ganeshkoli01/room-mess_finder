@@ -18,7 +18,7 @@ export const useVoiceSearch = (): UseVoiceSearchReturn => {
     const [isListening, setIsListening] = useState(false);
     const [transcript, setTranscript] = useState('');
     const [error, setError] = useState<string | null>(null);
-    const [recognition, setRecognition] = useState<SpeechRecognition | null>(null);
+    const [recognition, setRecognition] = useState<any>(null);
 
     // Check if speech recognition is supported
     const isSupported = typeof window !== 'undefined' &&
@@ -110,11 +110,10 @@ export const useVoiceSearch = (): UseVoiceSearchReturn => {
     };
 };
 
-// Extend Window interface for TypeScript
 declare global {
     interface Window {
-        SpeechRecognition: typeof SpeechRecognition;
-        webkitSpeechRecognition: typeof SpeechRecognition;
+        SpeechRecognition: any;
+        webkitSpeechRecognition: any;
     }
 }
 

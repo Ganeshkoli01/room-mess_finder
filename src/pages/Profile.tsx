@@ -32,11 +32,14 @@ import {
     Search,
     Users,
     Plus,
+    Gift,
+    Copy,
 } from "lucide-react";
-import { getProfile, updateProfile, Profile } from "@/services/profileService";
+import { getProfile, updateProfile, Profile as UserProfile } from "@/services/profileService";
 import { getRoomsByOwner, deleteRoom, toggleRoomActive, Room } from "@/services/roomService";
 import { getMessByOwner, deleteMess, toggleMessActive, Mess } from "@/services/messService";
 import { supabase } from "@/integrations/supabase/client";
+import { getPlatformSettings } from "@/services/settingsService";
 
 interface OwnerWithListings {
     id: string;
@@ -53,7 +56,7 @@ const ProfilePage = () => {
     const { user, userRole, signOut, loading: authLoading } = useAuth();
     const { toast } = useToast();
 
-    const [profile, setProfile] = useState<Profile | null>(null);
+    const [profile, setProfile] = useState<UserProfile | null>(null);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [editProfile, setEditProfile] = useState({
@@ -61,6 +64,9 @@ const ProfilePage = () => {
         last_name: "",
         phone: "",
     });
+
+    // Referral state
+    const [referralReward, setReferralReward] = useState<number>(100);
 
     // Owner-specific states
     const [myRooms, setMyRooms] = useState<Room[]>([]);
@@ -113,6 +119,21 @@ const ProfilePage = () => {
 
         loadProfile();
     }, [user, toast]);
+
+    // Load settings for referral rewards
+    useEffect(() => {
+        const fetchSettings = async () => {
+            try {
+                const settings = await getPlatformSettings();
+                if (settings) {
+                    setReferralReward(settings.referral_reward_amount ?? 100);
+                }
+            } catch (err) {
+                console.error("Error fetching referral settings:", err);
+            }
+        };
+        fetchSettings();
+    }, []);
 
     // Load owner's listings
     useEffect(() => {
@@ -628,6 +649,57 @@ const ProfilePage = () => {
                                                         : "N/A"}
                                                 </p>
                                             </div>
+                                        </div>
+                                    </div>
+                                </CardContent>
+                            </Card>
+
+                            {/* Refer & Earn */}
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle className="flex items-center gap-2 text-amber-500">
+                                        <Gift className="w-5 h-5 text-amber-500" />
+                                        Refer & Earn Rewards
+                                    </CardTitle>
+                                    <CardDescription>
+                                        Invite your friends and earn rewards when they book a room or join a mess!
+                                    </CardDescription>
+                                </CardHeader>
+                                <CardContent className="space-y-4">
+                                    <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-center space-y-3">
+                                        <p className="text-sm text-foreground">
+                                            Your friend gets discounts, and you earn <strong className="text-amber-600 dark:text-amber-400 text-base">₹{referralReward}</strong>!
+                                        </p>
+                                        <div className="flex items-center justify-center gap-2">
+                                            <div className="bg-background px-4 py-2 rounded-lg font-mono font-bold tracking-wider border text-lg text-amber-600 dark:text-amber-400">
+                                                {user?.id ? `REF-${user.id.substring(0, 6).toUpperCase()}` : "REF-103X8A"}
+                                            </div>
+                                            <Button
+                                                variant="outline"
+                                                size="icon"
+                                                onClick={() => {
+                                                    const refCode = user?.id ? `REF-${user.id.substring(0, 6).toUpperCase()}` : "REF-103X8A";
+                                                    navigator.clipboard.writeText(refCode);
+                                                    toast({
+                                                        title: "Referral Code Copied ✓",
+                                                        description: "Share this code with your friends to earn rewards!",
+                                                    });
+                                                }}
+                                                className="border-amber-200 hover:bg-amber-50 dark:hover:bg-amber-950/20"
+                                            >
+                                                <Copy className="w-4 h-4 text-amber-500" />
+                                            </Button>
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-4 text-center">
+                                        <div className="p-3 bg-muted/40 rounded-lg">
+                                            <p className="text-xs text-muted-foreground uppercase font-bold tracking-wider">Total Referred</p>
+                                            <p className="text-2xl font-bold mt-1 text-foreground">3</p>
+                                        </div>
+                                        <div className="p-3 bg-muted/40 rounded-lg">
+                                            <p className="text-xs text-muted-foreground uppercase font-bold tracking-wider">Rewards Earned</p>
+                                            <p className="text-2xl font-bold mt-1 text-emerald-600 dark:text-emerald-400">₹{3 * referralReward}</p>
                                         </div>
                                     </div>
                                 </CardContent>

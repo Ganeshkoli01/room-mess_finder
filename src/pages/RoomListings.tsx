@@ -22,9 +22,21 @@ const RoomListings = () => {
   const [searchParams] = useSearchParams();
   const { location: userLocation, calculateDistance, requestLocation, loading: locationLoading } = useLocation();
   const [showFilters, setShowFilters] = useState(false);
-  const [priceRange, setPriceRange] = useState([0, 20000]);
+  const facilitiesParam = searchParams.get("facilities");
+  const budgetParam = searchParams.get("budget");
+
+  const [priceRange, setPriceRange] = useState<number[]>(() => {
+    if (!budgetParam || budgetParam === "any") return [0, 20000];
+    if (budgetParam === "0-3000") return [0, 3000];
+    if (budgetParam === "3000-5000") return [3000, 5000];
+    if (budgetParam === "5000-8000") return [5000, 8000];
+    if (budgetParam === "8000+") return [8000, 50000];
+    return [0, 20000];
+  });
   const [selectedRoomTypes, setSelectedRoomTypes] = useState<string[]>([]);
-  const [selectedFacilities, setSelectedFacilities] = useState<string[]>([]);
+  const [selectedFacilities, setSelectedFacilities] = useState<string[]>(() => {
+    return facilitiesParam ? facilitiesParam.split(",").map((f) => f.trim().toLowerCase()) : [];
+  });
   const [verifiedOnly, setVerifiedOnly] = useState(false);
   const [locationFilter, setLocationFilter] = useState(searchParams.get("location") || "");
 
@@ -73,6 +85,7 @@ const RoomListings = () => {
             lng: room.longitude,
             distance: room.distance,
             isFromGoogle: false,
+            owner_id: room.owner_id,
           }));
           setRooms(transformedRooms);
         } else {
@@ -202,8 +215,18 @@ const RoomListings = () => {
     return filtered;
   }, [rooms, googleRooms, priceRange, selectedRoomTypes, selectedFacilities, verifiedOnly, locationFilter, userLocation, dataSource, showGooglePlaces, calculateDistance]);
 
-  const handleSearch = async (query: string) => {
+  const handleSearch = async (query: string, _searchType?: string, budget?: string, facilities?: string[]) => {
     setLocationFilter(query);
+    if (facilities) {
+      setSelectedFacilities(facilities.map((f) => f.toLowerCase()));
+    }
+    if (budget) {
+      if (budget === "any") setPriceRange([0, 20000]);
+      else if (budget === "0-3000") setPriceRange([0, 3000]);
+      else if (budget === "3000-5000") setPriceRange([3000, 5000]);
+      else if (budget === "5000-8000") setPriceRange([5000, 8000]);
+      else if (budget === "8000+") setPriceRange([8000, 50000]);
+    }
 
     if (query) {
       try {
@@ -223,6 +246,7 @@ const RoomListings = () => {
             lat: room.latitude,
             lng: room.longitude,
             isFromGoogle: false,
+            owner_id: room.owner_id,
           }));
           setRooms(transformedRooms);
         }
@@ -322,7 +346,7 @@ const RoomListings = () => {
             onValueChange={setPriceRange}
             min={0}
             max={20000}
-            step={1}
+            step={100}
             className="mb-2"
           />
         </div>
@@ -457,7 +481,12 @@ const RoomListings = () => {
 
           {/* Search Bar */}
           <div className="mb-8">
-            <SearchBar type="room" onSearch={handleSearch} />
+            <SearchBar
+              type="room"
+              onSearch={handleSearch}
+              initialFacilities={selectedFacilities}
+              onFacilitiesChange={setSelectedFacilities}
+            />
           </div>
 
           <div className="flex gap-8">

@@ -3,6 +3,7 @@
 // Handles booking payments, subscription payments, and refunds
 
 import logger from '@/lib/logger';
+import { createSubscription, createBooking } from "@/services/bookingService";
 
 declare global {
   interface Window {
@@ -464,6 +465,32 @@ const savePaymentRecord = async (
     localStorage.setItem('rm_bookings', JSON.stringify(bookings.slice(0, 100)));
 
     logger.info('Payment saved successfully', { context: 'Payment', data: receipt });
+
+    // Auto-create active subscription or booking record for owner & user
+    if (result.success) {
+      if (request.listingType === 'mess') {
+        await createSubscription({
+          userId: request.userId,
+          messId: request.listingId,
+          messTitle: request.listingTitle,
+          planType: (request.planType === 'daily' || request.planType === 'weekly' || request.planType === 'monthly') ? request.planType : 'monthly',
+          amount: result.amount,
+        }).catch(err => console.error("Auto createSubscription error:", err));
+      } else if (request.listingType === 'room') {
+        await createBooking({
+          enquiryId: `enq_${Date.now()}`,
+          userId: request.userId,
+          listingId: request.listingId,
+          listingType: 'room',
+          listingTitle: request.listingTitle,
+          startDate: new Date(),
+          amount: result.amount,
+          userName: request.userName,
+          userEmail: request.userEmail,
+          userPhone: request.userPhone,
+        }).catch(err => console.error("Auto createBooking error:", err));
+      }
+    }
   } catch (error) {
     logger.error('Failed to save payment', error, { context: 'Payment' });
   }
@@ -672,7 +699,7 @@ export const generateReceiptHTML = (receipt: PaymentReceipt): string => {
     
     <div class="footer">
       <p>Thank you for using Room & Mess Finder!</p>
-      <p style="margin-top: 8px;">For support, contact support@roomandmess.com</p>
+      <p style="margin-top: 8px;">For support, contact roommess8@gmail.com</p>
       <p style="margin-top: 4px;">This is a computer-generated receipt.</p>
     </div>
   </div>

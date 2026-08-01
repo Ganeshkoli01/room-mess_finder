@@ -61,7 +61,7 @@ export const useRealtimeEnquiries = (ownerId: string | null) => {
                 .order("created_at", { ascending: false });
 
             if (error) throw error;
-            setEnquiries((data as RealtimeEnquiry[]) || []);
+            setEnquiries((data as unknown as RealtimeEnquiry[]) || []);
         } catch (err) {
             console.error("Error fetching enquiries:", err);
         } finally {
@@ -103,7 +103,7 @@ export const useRealtimeEnquiries = (ownerId: string | null) => {
                         type: "new_enquiry",
                         title: "New Enquiry Received!",
                         message: `${newEnquiry.user_name} sent an enquiry for ${newEnquiry.listing_title}`,
-                    });
+                    }, ownerId);
 
                     // Play notification sound (optional)
                     playNotificationSound();
@@ -161,7 +161,7 @@ export const useRealtimeUserEnquiries = (userId: string | null) => {
                 .order("created_at", { ascending: false });
 
             if (error) throw error;
-            setEnquiries((data as RealtimeEnquiry[]) || []);
+            setEnquiries((data as unknown as RealtimeEnquiry[]) || []);
         } catch (err) {
             console.error("Error fetching user enquiries:", err);
         } finally {
@@ -206,7 +206,7 @@ export const useRealtimeUserEnquiries = (userId: string | null) => {
                                 type: "status_update",
                                 title: "Enquiry Approved! 🎉",
                                 message: `Your enquiry for ${updated.listing_title} has been approved. You can now book!`,
-                            });
+                            }, userId);
                         } else if (updated.status === "rejected") {
                             toast({
                                 title: "Enquiry Update",
@@ -263,7 +263,7 @@ export const useRealtimeBookings = (userId: string | null, asOwner = false) => {
 
             const { data, error } = await query;
             if (error) throw error;
-            setBookings((data as RealtimeBooking[]) || []);
+            setBookings((data as unknown as RealtimeBooking[]) || []);
         } catch (err) {
             console.error("Error fetching bookings:", err);
         } finally {

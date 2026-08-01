@@ -79,6 +79,7 @@ export type Database = {
           price_per_month: number
           timings: string | null
           updated_at: string
+          weekly_menu: Json | null
         }
         Insert: {
           address?: string | null
@@ -96,6 +97,7 @@ export type Database = {
           price_per_month: number
           timings?: string | null
           updated_at?: string
+          weekly_menu?: Json | null
         }
         Update: {
           address?: string | null
@@ -113,6 +115,7 @@ export type Database = {
           price_per_month?: number
           timings?: string | null
           updated_at?: string
+          weekly_menu?: Json | null
         }
         Relationships: []
       }
@@ -195,6 +198,10 @@ export type Database = {
           room_type: string
           title: string
           updated_at: string
+          deposit: number | null
+          available_from: string | null
+          preferred_tenants: string | null
+          rules: string | null
         }
         Insert: {
           address?: string | null
@@ -211,6 +218,10 @@ export type Database = {
           room_type: string
           title: string
           updated_at?: string
+          deposit?: number | null
+          available_from?: string | null
+          preferred_tenants?: string | null
+          rules?: string | null
         }
         Update: {
           address?: string | null
@@ -227,6 +238,10 @@ export type Database = {
           room_type?: string
           title?: string
           updated_at?: string
+          deposit?: number | null
+          available_from?: string | null
+          preferred_tenants?: string | null
+          rules?: string | null
         }
         Relationships: []
       }

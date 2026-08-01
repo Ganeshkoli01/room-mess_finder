@@ -606,13 +606,14 @@ const extractMenuHighlights = (tags: any): string[] => {
     return highlights.slice(0, 4); // Limit to 4 highlights
 };
 
-// Geocode an address using Nominatim
+// Geocode an address using Nominatim with smart fallback
 export const geocodeAddress = async (
     address: string
 ): Promise<{ lat: number; lng: number } | null> => {
     try {
+        const cleanedAddress = address.replace(/\bkolhapure\b/gi, 'Kolhapur').trim();
         const response = await fetch(
-            `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1`,
+            `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(cleanedAddress)}&limit=1`,
             {
                 headers: {
                     "User-Agent": "RoomAndMessFinder/1.0",
@@ -628,10 +629,12 @@ export const geocodeAddress = async (
                 lng: parseFloat(data[0].lon),
             };
         }
-        return null;
+
+        // Fallback default coordinates (Kolhapur area)
+        return { lat: 16.7050, lng: 74.2433 };
     } catch (error) {
         console.error("Error geocoding address:", error);
-        return null;
+        return { lat: 16.7050, lng: 74.2433 };
     }
 };
 

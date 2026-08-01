@@ -27,12 +27,17 @@ import {
     Sun,
     Moon,
     CreditCard,
+    QrCode,
+    Smartphone,
+    Building,
+    RefreshCw,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { createSubscription, getActiveSubscription } from "@/services/bookingService";
-import { initiatePayment, generateOrderId, PaymentDetails, getPlanPrices } from "@/services/paymentService";
+import { generateOrderId, PaymentDetails, PaymentResult, getPlanPrices } from "@/services/paymentService";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { RazorpayCheckoutModal } from "@/components/payment/RazorpayCheckoutModal";
 
 interface SubscriptionDialogProps {
     messId: string;
@@ -57,6 +62,8 @@ const SubscriptionDialog = ({
     const [loading, setLoading] = useState(false);
     const [selectedPlan, setSelectedPlan] = useState<PlanType>("monthly");
     const [selectedMeals, setSelectedMeals] = useState<MealType[]>(["breakfast", "lunch", "dinner"]);
+    const [renewing, setRenewing] = useState(false);
+    const [paymentMethod, setPaymentMethod] = useState<"upi" | "card" | "netbanking" | "razorpay">("upi");
     const { toast } = useToast();
     const { user } = useAuth();
     const { t } = useLanguage();
@@ -80,6 +87,7 @@ const SubscriptionDialog = ({
             icon: Calendar,
             price: adjustedPrices.daily,
             description: "1 day access",
+            badge: undefined as string | undefined,
         },
         weekly: {
             label: t('payment.weekly'),
@@ -133,61 +141,66 @@ const SubscriptionDialog = ({
         setStep("payment");
     };
 
-    const handlePayment = async () => {
-        if (!user) return;
+    const [showRazorpayModal, setShowRazorpayModal] = useState(false);
+    const [pendingDetails, setPendingDetails] = useState<PaymentDetails | null>(null);
 
-        setLoading(true);
+    const handlePayment = () => {
+        const activeUserId = user?.id || `user_${Date.now()}`;
+        const activeUserEmail = user?.email || "user@example.com";
+        const activeUserName = user?.user_metadata?.first_name || "Subscriber";
+        const amount = planDetails[selectedPlan].price;
 
-        try {
-            const amount = planDetails[selectedPlan].price;
+        const paymentDetails: PaymentDetails = {
+            amount,
+            currency: "INR",
+            orderId: generateOrderId(),
+            listingId: messId,
+            listingType: "mess",
+            listingTitle: messTitle,
+            planType: selectedPlan,
+            userId: activeUserId,
+            userEmail: activeUserEmail,
+            userName: activeUserName,
+            paymentMethod: paymentMethod,
+        };
 
-            // Create payment
-            const paymentDetails: PaymentDetails = {
-                amount,
-                currency: "INR",
-                orderId: generateOrderId(),
-                listingId: messId,
-                listingType: "mess",
-                listingTitle: messTitle,
-                planType: selectedPlan,
-                userId: user.id,
-                userEmail: user.email || "",
-                userName: user.user_metadata?.first_name || "User",
-            };
+        setPendingDetails(paymentDetails);
+        setShowRazorpayModal(true);
+    };
 
-            const paymentResult = await initiatePayment(paymentDetails);
+    const handleRazorpaySuccess = async (paymentResult: PaymentResult) => {
+        if (!pendingDetails) return;
+        const result = await createSubscription({
+            userId: pendingDetails.userId,
+            messId,
+            messTitle,
+            planType: selectedPlan,
+            amount: pendingDetails.amount,
+            mealTypes: selectedMeals,
+        });
 
-            if (paymentResult.success) {
-                // Create subscription
-                const result = createSubscription({
-                    userId: user.id,
-                    messId,
-                    messTitle,
-                    planType: selectedPlan,
-                    amount,
-                    mealTypes: selectedMeals,
-                });
-
-                if (result.success) {
-                    setStep("success");
-                    toast({
-                        title: "Subscription Active! 🎉",
-                        description: `Your ${selectedPlan} subscription to ${messTitle} is now active.`,
-                    });
-                    onSuccess?.();
-                } else {
-                    throw new Error(result.error);
-                }
-            }
-        } catch (error: any) {
+        if (result.success) {
+            setStep("success");
             toast({
-                title: "Payment Failed",
-                description: error.message,
+                title: "Subscription Active! 🎉",
+                description: `Your ${selectedPlan} subscription to ${messTitle} is now active.`,
+            });
+            onSuccess?.();
+        } else {
+            toast({
+                title: "Subscription Failed",
+                description: result.error || "Could not activate subscription",
                 variant: "destructive",
             });
-        } finally {
-            setLoading(false);
         }
+    };
+
+    const handleRazorpayFailure = (error: Error) => {
+        toast({
+            title: "Payment Failed",
+            description: error.message || "Payment process could not be completed.",
+            variant: "destructive",
+        });
     };
 
     const handleClose = () => {
@@ -199,8 +212,8 @@ const SubscriptionDialog = ({
         }, 300);
     };
 
-    // If already subscribed, show status
-    if (existingSubscription) {
+    // If already subscribed and not explicitly renewing, show active status with option to renew/change
+    if (existingSubscription && !renewing) {
         return (
             <Dialog open={open} onOpenChange={setOpen}>
                 <DialogTrigger asChild>
@@ -222,29 +235,36 @@ const SubscriptionDialog = ({
                         </DialogDescription>
                     </DialogHeader>
                     <div className="py-4">
-                        <div className="p-4 bg-success/10 rounded-xl space-y-2">
+                        <div className="p-4 bg-success/10 rounded-xl space-y-2 border border-success/20">
                             <div className="flex justify-between text-sm">
-                                <span>Mess</span>
-                                <span className="font-medium">{existingSubscription.messTitle}</span>
+                                <span className="text-muted-foreground">Mess</span>
+                                <span className="font-medium text-foreground">{existingSubscription.messTitle}</span>
                             </div>
                             <div className="flex justify-between text-sm">
-                                <span>Plan</span>
-                                <span className="capitalize">{existingSubscription.planType}</span>
+                                <span className="text-muted-foreground">Plan</span>
+                                <span className="capitalize font-medium text-foreground">{existingSubscription.planType}</span>
                             </div>
                             <div className="flex justify-between text-sm">
-                                <span>Meals</span>
-                                <span className="capitalize">{existingSubscription.mealTypes.join(", ")}</span>
+                                <span className="text-muted-foreground">Meals</span>
+                                <span className="capitalize font-medium text-foreground">{existingSubscription.mealTypes.join(", ")}</span>
                             </div>
                             <div className="flex justify-between text-sm">
-                                <span>Valid Until</span>
+                                <span className="text-muted-foreground">Valid Until</span>
                                 <span className="font-medium text-success">
                                     {new Date(existingSubscription.endDate).toLocaleDateString()}
                                 </span>
                             </div>
                         </div>
                     </div>
-                    <DialogFooter>
-                        <Button onClick={handleClose} className="w-full">
+                    <DialogFooter className="flex-col gap-2">
+                        <Button
+                            onClick={() => setRenewing(true)}
+                            className="w-full gap-2 bg-primary hover:bg-primary/90"
+                        >
+                            <RefreshCw className="w-4 h-4" />
+                            Renew / Change Subscription Plan
+                        </Button>
+                        <Button variant="outline" onClick={handleClose} className="w-full">
                             Close
                         </Button>
                     </DialogFooter>
@@ -415,38 +435,95 @@ const SubscriptionDialog = ({
                                 Complete Payment
                             </DialogTitle>
                             <DialogDescription>
-                                Pay to activate your subscription
+                                Select a payment method to activate your subscription
                             </DialogDescription>
                         </DialogHeader>
 
-                        <div className="py-4">
-                            <div className="p-4 bg-muted rounded-xl space-y-2">
+                        <div className="py-4 space-y-4">
+                            {/* Summary Card */}
+                            <div className="p-4 bg-muted/60 rounded-xl space-y-2 border border-border">
                                 <div className="flex justify-between text-sm">
-                                    <span>Mess</span>
+                                    <span className="text-muted-foreground">Mess</span>
                                     <span className="font-medium">{messTitle}</span>
                                 </div>
                                 <div className="flex justify-between text-sm">
-                                    <span>Plan</span>
-                                    <span className="capitalize">{selectedPlan}</span>
+                                    <span className="text-muted-foreground">Plan</span>
+                                    <span className="capitalize font-medium">{selectedPlan}</span>
                                 </div>
                                 <div className="flex justify-between text-sm">
-                                    <span>Meals</span>
-                                    <span className="capitalize">{selectedMeals.join(", ")}</span>
+                                    <span className="text-muted-foreground">Meals</span>
+                                    <span className="capitalize font-medium">{selectedMeals.join(", ")}</span>
                                 </div>
-                                <hr />
+                                <hr className="border-border" />
                                 <div className="flex justify-between font-semibold text-lg">
-                                    <span>Amount</span>
-                                    <span className="text-primary">
+                                    <span>Total Payable Amount</span>
+                                    <span className="text-primary font-bold">
                                         ₹{planDetails[selectedPlan].price.toLocaleString()}
                                     </span>
                                 </div>
+                            </div>
+
+                            {/* Payment Method Selector */}
+                            <div className="space-y-2">
+                                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                                    Select Payment Method
+                                </Label>
+                                <RadioGroup
+                                    value={paymentMethod}
+                                    onValueChange={(val) => setPaymentMethod(val as any)}
+                                    className="grid grid-cols-2 gap-2"
+                                >
+                                    <div>
+                                        <RadioGroupItem value="upi" id="pm-upi" className="peer sr-only" />
+                                        <Label
+                                            htmlFor="pm-upi"
+                                            className="flex flex-col items-center justify-center p-3 rounded-xl border-2 cursor-pointer transition-all peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-primary/5 hover:bg-muted text-center"
+                                        >
+                                            <Smartphone className="w-5 h-5 text-primary mb-1" />
+                                            <span className="text-xs font-semibold">UPI / GPay</span>
+                                        </Label>
+                                    </div>
+                                    <div>
+                                        <RadioGroupItem value="card" id="pm-card" className="peer sr-only" />
+                                        <Label
+                                            htmlFor="pm-card"
+                                            className="flex flex-col items-center justify-center p-3 rounded-xl border-2 cursor-pointer transition-all peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-primary/5 hover:bg-muted text-center"
+                                        >
+                                            <CreditCard className="w-5 h-5 text-primary mb-1" />
+                                            <span className="text-xs font-semibold">Card</span>
+                                        </Label>
+                                    </div>
+                                    <div>
+                                        <RadioGroupItem value="netbanking" id="pm-nb" className="peer sr-only" />
+                                        <Label
+                                            htmlFor="pm-nb"
+                                            className="flex flex-col items-center justify-center p-3 rounded-xl border-2 cursor-pointer transition-all peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-primary/5 hover:bg-muted text-center"
+                                        >
+                                            <Building className="w-5 h-5 text-primary mb-1" />
+                                            <span className="text-xs font-semibold">Net Banking</span>
+                                        </Label>
+                                    </div>
+                                    <div>
+                                        <RadioGroupItem value="razorpay" id="pm-rzp" className="peer sr-only" />
+                                        <Label
+                                            htmlFor="pm-rzp"
+                                            className="flex flex-col items-center justify-center p-3 rounded-xl border-2 cursor-pointer transition-all peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-primary/5 hover:bg-muted text-center"
+                                        >
+                                            <QrCode className="w-5 h-5 text-primary mb-1" />
+                                            <span className="text-xs font-semibold">Razorpay</span>
+                                        </Label>
+                                    </div>
+                                </RadioGroup>
                             </div>
                         </div>
 
                         <DialogFooter className="flex-col gap-2">
                             <Button onClick={handlePayment} disabled={loading} className="w-full gap-2">
                                 {loading ? (
-                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                    <>
+                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                        Processing Payment...
+                                    </>
                                 ) : (
                                     <>
                                         <CreditCard className="w-4 h-4" />
@@ -478,6 +555,13 @@ const SubscriptionDialog = ({
                     </div>
                 )}
             </DialogContent>
+            <RazorpayCheckoutModal
+                open={showRazorpayModal}
+                onOpenChange={setShowRazorpayModal}
+                details={pendingDetails}
+                onSuccess={handleRazorpaySuccess}
+                onFailure={handleRazorpayFailure}
+            />
         </Dialog>
     );
 };

@@ -34,6 +34,7 @@ interface RoomCardProps {
   facilities: string[];
   isVerified?: boolean;
   ownerId?: string;
+  owner_id?: string;
   distance?: number;
   isFromOSM?: boolean;
   lat?: number;
@@ -60,12 +61,14 @@ const RoomCard = ({
   reviews,
   facilities,
   isVerified = false,
-  ownerId = "demo-owner",
+  ownerId,
+  owner_id,
   distance,
   isFromOSM = false,
   lat,
   lng,
 }: RoomCardProps) => {
+  const finalOwnerId = owner_id || ownerId || "demo-owner";
   const [isFavorite, setIsFavorite] = useState(false);
   const [inCompare, setInCompare] = useState(false);
   const { toast } = useToast();
@@ -248,7 +251,7 @@ const RoomCard = ({
             listingId={id}
             listingType="room"
             listingTitle={title}
-            ownerId={ownerId}
+            ownerId={finalOwnerId}
             trigger={<Button variant="default" className="flex-1">{t('card.sendEnquiry')}</Button>}
           />
 

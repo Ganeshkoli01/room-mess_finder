@@ -31,6 +31,7 @@ import {
     Building2,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { createEnquiry } from "@/services/bookingService";
 import {
     ContactInfo,
     InquiryData,
@@ -64,6 +65,7 @@ interface ContactOwnerModalProps {
     listingType: "room" | "mess";
     price: number;
     contact?: ContactInfo;
+    ownerId?: string;
 }
 
 const ContactOwnerModal = ({
@@ -74,6 +76,7 @@ const ContactOwnerModal = ({
     listingType,
     price,
     contact,
+    ownerId,
 }: ContactOwnerModalProps) => {
     const { toast } = useToast();
     const { user } = useAuth();
@@ -127,12 +130,13 @@ const ContactOwnerModal = ({
                 listingId,
                 listingName,
                 listingType,
-                contact ? {
-                    phone: contact.phone,
-                    email: contact.email,
-                    ownerName: contact.ownerName,
-                    operatorName: contact.operatorName,
-                } : undefined
+                {
+                    phone: contact?.phone,
+                    email: contact?.email,
+                    ownerName: contact?.ownerName,
+                    operatorName: contact?.operatorName,
+                    ownerId: ownerId,
+                }
             );
             setOwner(ownerData);
 
@@ -141,12 +145,13 @@ const ContactOwnerModal = ({
                 listingName,
                 listingType,
                 price,
-                contact ? {
-                    phone: contact.phone,
-                    email: contact.email,
-                    ownerName: contact.ownerName,
-                    operatorName: contact.operatorName,
-                } : undefined
+                {
+                    phone: contact?.phone,
+                    email: contact?.email,
+                    ownerName: contact?.ownerName,
+                    operatorName: contact?.operatorName,
+                    ownerId: ownerId,
+                }
             );
             setBusiness(businessData);
         }
@@ -233,7 +238,7 @@ const ContactOwnerModal = ({
                     listingType,
                     listingTitle: listingName,
                     planType: listingType === "room" ? "booking" : planType,
-                    userId: `user_${Date.now()}`,
+                    userId: user?.id || `user_${Date.now()}`,
                     userEmail: paymentFormData.userEmail || `${paymentFormData.userPhone}@temp.com`,
                     userName: paymentFormData.userName,
                     userPhone: paymentFormData.userPhone,
@@ -246,7 +251,7 @@ const ContactOwnerModal = ({
                     listingType,
                     listingTitle: listingName,
                     planType: listingType === "room" ? "booking" : planType,
-                    userId: `user_${Date.now()}`,
+                    userId: user?.id || `user_${Date.now()}`,
                     userEmail: paymentFormData.userEmail || `${paymentFormData.userPhone}@temp.com`,
                     userName: paymentFormData.userName,
                     userPhone: paymentFormData.userPhone,
@@ -290,6 +295,23 @@ const ContactOwnerModal = ({
                         mealPlan: paymentFormData.mealPlan,
                         subscriptionDuration: paymentFormData.subscriptionDuration,
                     });
+
+                    // Save enquiry to Supabase/System database
+                    createEnquiry({
+                        userId: user?.id || `guest_${Date.now()}`,
+                        listingId,
+                        listingType,
+                        listingTitle: listingName,
+                        ownerId: owner.id,
+                        ownerEmail: owner.email,
+                        ownerPhone: owner.phone,
+                        ownerWhatsApp: owner.whatsapp,
+                        ownerName: owner.ownerName,
+                        userName: paymentFormData.userName,
+                        userEmail: paymentFormData.userEmail || `${paymentFormData.userPhone}@temp.com`,
+                        userPhone: paymentFormData.userPhone || undefined,
+                        message: paymentFormData.message || `Hi, I paid and booked this ${listingType}. Please confirm.`,
+                    }).catch(err => console.error("Error creating system enquiry:", err));
                 }
             } catch (error: any) {
                 if (error.message !== "Payment cancelled by user") {

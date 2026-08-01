@@ -15,6 +15,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { getRooms } from "@/services/roomService";
 import { getAllMess } from "@/services/messService";
 import heroImage from "@/assets/hero-room.jpg";
+import { getPlatformSettings } from "@/services/settingsService";
 
 // Demo data as fallback - Kolhapur locations
 const demoRooms = [
@@ -143,6 +144,40 @@ const Index = () => {
   const [loading, setLoading] = useState(true);
   const [usingDemoData, setUsingDemoData] = useState(false);
 
+  // Settings State
+  const [homepageBanners, setHomepageBanners] = useState<string[]>([]);
+  const [featuredCities, setFeaturedCities] = useState<string[]>([]);
+  const [currentBannerIdx, setCurrentBannerIdx] = useState(0);
+
+  // Fetch platform settings on mount
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const settings = await getPlatformSettings();
+        if (settings) {
+          if (settings.homepage_banners && settings.homepage_banners.length > 0) {
+            setHomepageBanners(settings.homepage_banners);
+          }
+          if (settings.featured_cities && settings.featured_cities.length > 0) {
+            setFeaturedCities(settings.featured_cities);
+          }
+        }
+      } catch (err) {
+        console.error("Error loading settings in Index:", err);
+      }
+    };
+    fetchSettings();
+  }, []);
+
+  // Rotate homepage banners
+  useEffect(() => {
+    if (homepageBanners.length <= 1) return;
+    const interval = setInterval(() => {
+      setCurrentBannerIdx((prev) => (prev + 1) % homepageBanners.length);
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [homepageBanners]);
+
   // Auto-request location on page load
   useEffect(() => {
     requestLocation();
@@ -175,6 +210,7 @@ const Index = () => {
             lat: room.latitude,
             lng: room.longitude,
             distance: room.distance,
+            owner_id: room.owner_id,
           }));
           setRooms(transformedRooms);
           setUsingDemoData(false);
@@ -200,6 +236,7 @@ const Index = () => {
             lat: mess.latitude,
             lng: mess.longitude,
             distance: mess.distance,
+            owner_id: mess.owner_id,
           }));
           setMessList(transformedMess);
         } else {
@@ -301,14 +338,34 @@ const Index = () => {
                   </Button>
                 </Link>
               </div>
+
+              {/* Featured Cities */}
+              {featuredCities.length > 0 && (
+                <div className="mt-8 text-center lg:text-left animate-slide-up animate-stagger-7">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-primary-foreground/60 block mb-3">
+                    Featured Cities:
+                  </span>
+                  <div className="flex flex-wrap gap-2 justify-center lg:justify-start">
+                    {featuredCities.map((city) => (
+                      <Link
+                        key={city}
+                        to={`/rooms?location=${encodeURIComponent(city)}`}
+                        className="text-xs bg-primary-foreground/10 hover:bg-primary-foreground/20 text-primary-foreground px-3 py-1.5 rounded-full transition-all border border-primary-foreground/5 hover:scale-105 duration-200"
+                      >
+                        {city}
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="relative hidden lg:block animate-float">
               <div className="relative rounded-3xl overflow-hidden shadow-2xl card-hover-glow">
                 <img
-                  src={heroImage}
+                  src={homepageBanners[currentBannerIdx] || heroImage}
                   alt="Cozy student room"
-                  className="w-full h-auto object-cover animate-image-reveal"
+                  className="w-full h-[400px] object-cover animate-image-reveal transition-all duration-700"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-foreground/40 via-transparent to-transparent" />
               </div>

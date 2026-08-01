@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -30,11 +30,16 @@ import {
   Mail,
   Save,
   Loader2,
+  Trash2,
 } from "lucide-react";
 import {
   getUserEnquiries,
+  fetchUserEnquiries,
+  deleteEnquiry,
   getUserBookings,
   getUserSubscriptions,
+  fetchUserBookings,
+  fetchUserSubscriptions,
   Enquiry,
   Booking,
   MessSubscription,
@@ -48,6 +53,7 @@ import BookingDialog from "@/components/booking/BookingDialog";
 import PaymentDialog from "@/components/payment/PaymentDialog";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { getProfile, updateProfile, Profile } from "@/services/profileService";
+import { checkAndNotifyExpiredSubscriptions } from "@/services/subscriptionExpiryService";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
@@ -62,11 +68,41 @@ const statusConfig: Record<EnquiryStatus, { icon: typeof Clock; label: string; c
 
 const UserDashboard = () => {
   const navigate = useNavigate();
-  const { user, signOut } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { user, userRole, loading: authLoading, signOut } = useAuth();
+
+  // Role-based routing redirect
+  useEffect(() => {
+    if (!authLoading) {
+      if (!user) {
+        navigate("/auth");
+      } else if (userRole === "admin") {
+        navigate("/admin/dashboard");
+      } else if (userRole === "owner") {
+        navigate("/owner/dashboard");
+      }
+    }
+  }, [user, userRole, authLoading, navigate]);
   const { toast } = useToast();
   const { t } = useLanguage();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState("overview");
+  const [activeTab, setActiveTab] = useState(() => {
+    return searchParams.get("tab") || "overview";
+  });
+
+  // Sync activeTab with URL param so it updates when param changes (e.g. back navigation or click)
+  useEffect(() => {
+    const tab = searchParams.get("tab");
+    if (tab && tab !== activeTab) {
+      setActiveTab(tab);
+    }
+  }, [searchParams]);
+
+  // Update search param when activeTab changes
+  const handleTabChange = (value: string) => {
+    setActiveTab(value);
+    setSearchParams({ tab: value });
+  };
   const [enquiries, setEnquiries] = useState<Enquiry[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [subscriptions, setSubscriptions] = useState<MessSubscription[]>([]);
@@ -87,10 +123,22 @@ const UserDashboard = () => {
 
   const loadData = async () => {
     if (!user) return;
-    setEnquiries(getUserEnquiries(user.id));
+    setEnquiries(getUserEnquiries(user.id, user.email));
     setBookings(getUserBookings(user.id));
     setSubscriptions(getUserSubscriptions(user.id));
     setSavedCount(getFavorites().length);
+
+    // Check and notify expired mess subscriptions & room stays
+    checkAndNotifyExpiredSubscriptions(user.id).then(() => {
+      // Re-fetch bookings and subscriptions after checking expiration
+      fetchUserBookings(user.id).then(setBookings);
+      fetchUserSubscriptions(user.id).then(setSubscriptions);
+    }).catch(console.error);
+
+    // Fetch fresh enquiries asynchronously from Supabase
+    fetchUserEnquiries(user.id, user.email).then((data) => {
+      setEnquiries(data);
+    });
 
     // Load profile
     setProfileLoading(true);
@@ -108,6 +156,27 @@ const UserDashboard = () => {
       console.error("Error loading profile:", err);
     } finally {
       setProfileLoading(false);
+    }
+  };
+
+  const handleDeleteEnquiry = async (enquiryId: string) => {
+    // Optimistic UI update
+    setEnquiries((prev) => prev.filter((e) => e.id !== enquiryId));
+
+    const success = await deleteEnquiry(enquiryId);
+    if (success) {
+      toast({
+        title: "Enquiry Deleted",
+        description: "The enquiry has been removed.",
+      });
+      loadData();
+    } else {
+      toast({
+        title: "Error",
+        description: "Failed to delete enquiry.",
+        variant: "destructive",
+      });
+      loadData();
     }
   };
 
@@ -197,7 +266,7 @@ const UserDashboard = () => {
             {navItems.map((item) => (
               <button
                 key={item.id}
-                onClick={() => setActiveTab(item.id)}
+                onClick={() => handleTabChange(item.id)}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-colors ${activeTab === item.id
                   ? "bg-primary/10 text-primary"
                   : "text-muted-foreground hover:bg-muted"
@@ -274,7 +343,7 @@ const UserDashboard = () => {
           </div>
 
           {/* Tabs Content */}
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+          <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
             {/* Overview Tab */}
             <TabsContent value="overview" className="space-y-6">
               {/* Approved Enquiries - Ready to Book */}
@@ -391,7 +460,13 @@ const UserDashboard = () => {
                           </div>
                           <div className="flex-1 min-w-0">
                             <h3 className="font-medium text-foreground">{enquiry.listingTitle}</h3>
-                            <p className="text-sm text-muted-foreground line-clamp-1">{enquiry.message}</p>
+                            <p className="text-sm text-muted-foreground line-clamp-2">My Message: {enquiry.message}</p>
+                            {enquiry.ownerResponse && (
+                              <div className="mt-2 p-3 bg-muted/70 rounded-lg border border-border text-xs leading-relaxed max-w-lg">
+                                <p className="font-semibold text-primary mb-1">Owner Response:</p>
+                                <p className="text-foreground">{enquiry.ownerResponse}</p>
+                              </div>
+                            )}
                             <p className="text-xs text-muted-foreground mt-1">
                               {new Date(enquiry.createdAt).toLocaleDateString()}
                             </p>
@@ -418,6 +493,15 @@ const UserDashboard = () => {
                               />
                             )
                           )}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 h-9 w-9 rounded-lg transition-colors ml-1"
+                            onClick={() => handleDeleteEnquiry(enquiry.id)}
+                            title="Delete Enquiry"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
                         </div>
                       );
                     })}
@@ -497,7 +581,7 @@ const UserDashboard = () => {
                             {subscription.planType} Plan • {subscription.mealTypes.join(", ")}
                           </p>
                           <p className="text-xs text-muted-foreground">
-                            Valid until: {new Date(subscription.endDate).toLocaleDateString()}
+                            Amount Paid: ₹{subscription.amount?.toLocaleString()} • Valid until: {new Date(subscription.endDate).toLocaleDateString()}
                           </p>
                         </div>
                         <Badge className={subscription.status === "active" ? "bg-success/10 text-success" : "bg-warning/10 text-warning"}>

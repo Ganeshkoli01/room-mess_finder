@@ -154,16 +154,21 @@ export const getOwnerDetails = (
     listingId: string,
     businessName: string,
     businessType: 'room' | 'mess',
-    existingContact?: { phone?: string; email?: string; ownerName?: string; operatorName?: string }
+    existingContact?: { phone?: string; email?: string; ownerName?: string; operatorName?: string; ownerId?: string }
 ): OwnerDetails => {
     // Check cache first
     const cached = ownerCache.get(listingId);
-    if (cached) return cached;
+    if (cached) {
+        if (existingContact?.ownerId) {
+            cached.id = existingContact.ownerId;
+        }
+        return cached;
+    }
 
     // If listing already has real contact info from OSM, use it
     if (existingContact?.phone && existingContact?.ownerName) {
         const owner: OwnerDetails = {
-            id: `owner-${listingId}`,
+            id: existingContact.ownerId || `owner-${listingId}`,
             ownerName: existingContact.ownerName || existingContact.operatorName || 'Property Owner',
             businessName: businessName,
             phone: existingContact.phone.startsWith('+') ? existingContact.phone : `+91 ${existingContact.phone}`,
@@ -189,7 +194,7 @@ export const getOwnerDetails = (
     const email = generateEmail(name, businessName);
 
     const owner: OwnerDetails = {
-        id: `owner-${listingId}`,
+        id: existingContact?.ownerId || `owner-${listingId}`,
         ownerName: existingContact?.ownerName || existingContact?.operatorName || name,
         businessName: businessName,
         phone: existingContact?.phone || phone,
@@ -232,7 +237,7 @@ export const getBusinessListing = (
     businessName: string,
     businessType: 'room' | 'mess',
     basePrice: number,
-    existingContact?: { phone?: string; email?: string; ownerName?: string; operatorName?: string }
+    existingContact?: { phone?: string; email?: string; ownerName?: string; operatorName?: string; ownerId?: string }
 ): BusinessListing => {
     const owner = getOwnerDetails(listingId, businessName, businessType, existingContact);
 

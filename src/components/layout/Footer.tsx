@@ -24,16 +24,40 @@ const Footer = () => {
             </p>
             {/* Social Links */}
             <div className="flex gap-3">
-              <a href="#" className="w-8 h-8 rounded-full bg-muted flex items-center justify-center hover:bg-primary hover:text-white transition-colors">
+              <a
+                href="https://www.instagram.com/room._.mess?igsh=MXUyaTdybDZ2NmFxMQ=="
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Facebook"
+                className="w-8 h-8 rounded-full bg-muted flex items-center justify-center hover:bg-primary hover:text-white transition-colors"
+              >
                 <Facebook className="w-4 h-4" />
               </a>
-              <a href="#" className="w-8 h-8 rounded-full bg-muted flex items-center justify-center hover:bg-primary hover:text-white transition-colors">
+              <a
+                href="https://www.instagram.com/room._.mess?igsh=MXUyaTdybDZ2NmFxMQ=="
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Twitter"
+                className="w-8 h-8 rounded-full bg-muted flex items-center justify-center hover:bg-primary hover:text-white transition-colors"
+              >
                 <Twitter className="w-4 h-4" />
               </a>
-              <a href="#" className="w-8 h-8 rounded-full bg-muted flex items-center justify-center hover:bg-primary hover:text-white transition-colors">
+              <a
+                href="https://www.instagram.com/room._.mess?igsh=MXUyaTdybDZ2NmFxMQ=="
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Instagram"
+                className="w-8 h-8 rounded-full bg-muted flex items-center justify-center hover:bg-primary hover:text-white transition-colors"
+              >
                 <Instagram className="w-4 h-4" />
               </a>
-              <a href="#" className="w-8 h-8 rounded-full bg-muted flex items-center justify-center hover:bg-primary hover:text-white transition-colors">
+              <a
+                href="https://www.instagram.com/room._.mess?igsh=MXUyaTdybDZ2NmFxMQ=="
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="LinkedIn"
+                className="w-8 h-8 rounded-full bg-muted flex items-center justify-center hover:bg-primary hover:text-white transition-colors"
+              >
                 <Linkedin className="w-4 h-4" />
               </a>
             </div>
@@ -71,19 +95,19 @@ const Footer = () => {
             <h3 className="font-semibold text-foreground mb-3 text-sm md:text-base">Support</h3>
             <ul className="space-y-2">
               <li>
-                <a href="#" className="text-sm text-muted-foreground hover:text-primary transition-colors">
-                  Help Center
-                </a>
+                <Link to="/p/about" className="text-sm text-muted-foreground hover:text-primary transition-colors">
+                  About Us
+                </Link>
               </li>
               <li>
-                <a href="#" className="text-sm text-muted-foreground hover:text-primary transition-colors">
+                <Link to="/p/privacy" className="text-sm text-muted-foreground hover:text-primary transition-colors">
                   Privacy Policy
-                </a>
+                </Link>
               </li>
               <li>
-                <a href="#" className="text-sm text-muted-foreground hover:text-primary transition-colors">
+                <Link to="/p/terms" className="text-sm text-muted-foreground hover:text-primary transition-colors">
                   Terms of Service
-                </a>
+                </Link>
               </li>
               <li>
                 <a href="#" className="text-sm text-muted-foreground hover:text-primary transition-colors">
@@ -102,15 +126,15 @@ const Footer = () => {
                 <span>Kolhapur, Maharashtra, India</span>
               </li>
               <li>
-                <a href="mailto:support@roomandmess.com" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors">
+                <a href="mailto:roommess8@gmail.com" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors">
                   <Mail className="w-4 h-4 flex-shrink-0" />
-                  <span className="break-all">support@roomandmess.com</span>
+                  <span className="break-all">roommess8@gmail.com</span>
                 </a>
               </li>
               <li>
-                <a href="tel:+919876543210" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors">
+                <a href="tel:+918010434421" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors">
                   <Phone className="w-4 h-4 flex-shrink-0" />
-                  <span>+91 98765 43210</span>
+                  <span>+91 80104 34421</span>
                 </a>
               </li>
             </ul>

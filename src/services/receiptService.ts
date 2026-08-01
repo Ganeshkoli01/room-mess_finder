@@ -245,7 +245,7 @@ export const generateReceiptPDF = async (data: ReceiptData): Promise<Blob> => {
     const notes = [
         "• This is a computer-generated receipt and does not require a signature.",
         "• Please keep this receipt for your records.",
-        "• For any queries, contact us at support@roomandmess.com",
+        "• For any queries, contact us at roommess8@gmail.com",
         "• Refund policy: Cancellations made within 24 hours are eligible for a full refund.",
         data.listingType === "room"
             ? "• Your room booking is confirmed. The owner will contact you shortly."
@@ -268,7 +268,7 @@ export const generateReceiptPDF = async (data: ReceiptData): Promise<Blob> => {
     pdf.setTextColor(...mutedColor);
     pdf.setFontSize(8);
     pdf.text("Room & Mess Finder | Kolhapur, Maharashtra, India", pageWidth / 2, yPos, { align: "center" });
-    pdf.text("www.roomandmess.com | support@roomandmess.com", pageWidth / 2, yPos + 5, { align: "center" });
+    pdf.text("www.roomandmess.com | roommess8@gmail.com", pageWidth / 2, yPos + 5, { align: "center" });
     pdf.text(`Generated on ${formatDate(new Date())}`, pageWidth / 2, yPos + 10, { align: "center" });
 
     // Return as blob

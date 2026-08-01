@@ -40,7 +40,7 @@ const Navbar = () => {
   const [compareCount, setCompareCount] = useState(0);
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, userRole, signOut } = useAuth();
+  const { user, userRole, signOut, isImpersonating, impersonatorName, stopImpersonating } = useAuth();
   const { t } = useLanguage();
 
   // Update counts on mount and after navigation
@@ -85,7 +85,20 @@ const Navbar = () => {
 
   return (
     <>
-      <nav className="fixed top-0 left-0 right-0 z-50 glass border-b border-border/50">
+      {isImpersonating && (
+        <div className="bg-purple-600 text-white py-2 px-4 text-center text-xs font-semibold flex items-center justify-center gap-3 z-[100] fixed top-0 left-0 right-0 h-9">
+          <span>
+            🕵️ You are currently impersonating <strong>{impersonatorName || user?.email}</strong> (Admin Mode)
+          </span>
+          <button 
+            onClick={stopImpersonating} 
+            className="bg-white text-purple-700 px-2 py-0.5 rounded font-bold hover:bg-purple-100 transition-colors"
+          >
+            Stop Impersonating
+          </button>
+        </div>
+      )}
+      <nav className={`fixed left-0 right-0 z-50 glass border-b border-border/50 ${isImpersonating ? 'top-9' : 'top-0'}`}>
         <div className="container mx-auto px-4">
           <div className="flex items-center justify-between h-16">
             {/* Logo */}

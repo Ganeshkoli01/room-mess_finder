@@ -86,7 +86,7 @@ const BookingDialog = ({
             const endDate = new Date(moveInDate);
             endDate.setMonth(endDate.getMonth() + duration);
 
-            const result = createBooking({
+            const result = await createBooking({
                 enquiryId: enquiry.id,
                 userId: user.id,
                 listingId: enquiry.listingId,
@@ -95,6 +95,10 @@ const BookingDialog = ({
                 startDate: moveInDate,
                 endDate,
                 amount: grandTotal,
+                ownerId: enquiry.ownerId,
+                userName: user.user_metadata?.first_name ? `${user.user_metadata.first_name} ${user.user_metadata.last_name || ""}` : enquiry.userName,
+                userEmail: user.email || enquiry.userEmail,
+                userPhone: user.phone || enquiry.userPhone || "",
             });
 
             if (result.success) {
