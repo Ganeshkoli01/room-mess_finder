@@ -170,6 +170,28 @@ export const createEnquiry = async (data: {
 
         let enquiryId: string;
 
+        // Insert into bookings table for Owner Dashboard
+        try {
+            await (supabase as any)
+                .from("bookings")
+                .insert({
+                    user_id: data.userId,
+                    listing_id: data.listingId,
+                    listing_type: data.listingType,
+                    owner_id: data.ownerId,
+                    user_name: data.userName,
+                    user_email: data.userEmail,
+                    user_phone: data.userPhone || null,
+                    message: data.message,
+                    status: "pending",
+                    check_in_date: new Date().toISOString().split("T")[0],
+                    check_out_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
+                    created_at: new Date().toISOString(),
+                });
+        } catch (e) {
+            console.warn("Could not insert directly to bookings table:", e);
+        }
+
         if (!error && dbData) {
             enquiryId = dbData.id;
             logger.info("Enquiry saved to Supabase enquiries table");

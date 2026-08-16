@@ -38,6 +38,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getRoomById, updateRoom, Room } from "@/services/roomService";
+import { ListingAvailabilityCalendar } from "@/components/booking/ListingAvailabilityCalendar";
 import { uploadListingImage } from "@/services/uploadService";
 import { getOsmRoomById, PlaceContactInfo } from "@/services/osmPlacesService";
 import { getCachedRoom } from "@/services/osmCacheService";
@@ -953,6 +954,13 @@ const RoomDetail = () => {
                                         </div>
                                     )}
                                 </div>
+
+                                {/* Public Listing Availability Calendar */}
+                                <ListingAvailabilityCalendar
+                                    listingId={displayRoom.id}
+                                    listingType="room"
+                                    onSelectDate={() => setShowContactModal(true)}
+                                />
 
                                 {/* Action Buttons */}
                                 <div className="space-y-3">

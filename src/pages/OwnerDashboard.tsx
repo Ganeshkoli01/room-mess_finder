@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { OwnerBookingManager } from "@/components/owner/OwnerBookingManager";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/contexts/AuthContext";
@@ -1348,140 +1349,15 @@ const OwnerDashboard = () => {
               </div>
             </TabsContent>
 
-            {/* Bookings & Subscriptions Tab */}
+            {/* Bookings & Subscriptions Tab (Phase 1) */}
             <TabsContent value="bookings">
-              <div className="space-y-8">
-                {/* Room Bookings */}
-                <div className="bg-card rounded-2xl p-6 shadow-soft">
-                  <div className="flex items-center justify-between mb-6">
-                    <h2 className="font-heading font-semibold text-xl flex items-center gap-2">
-                      <Building2 className="w-5 h-5 text-primary" />
-                      Room Bookings
-                    </h2>
-                    <Button variant="outline" size="sm" onClick={fetchSubscriptions}>
-                      Refresh
-                    </Button>
-                  </div>
-
-                  {loadingRoomBookings ? (
-                    <div className="flex justify-center py-12">
-                      <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                    </div>
-                  ) : roomBookings.length === 0 ? (
-                    <div className="text-center py-12">
-                      <Building2 className="w-16 h-16 mx-auto text-muted-foreground/50 mb-4" />
-                      <p className="text-muted-foreground">No room bookings recorded yet</p>
-                    </div>
-                  ) : (
-                    <div className="overflow-x-auto border rounded-xl">
-                      <table className="w-full text-left border-collapse">
-                        <thead>
-                          <tr className="border-b bg-muted/30">
-                            <th className="py-3 px-4 font-semibold text-sm">Subscriber</th>
-                            <th className="py-3 px-4 font-semibold text-sm">Room Title</th>
-                            <th className="py-3 px-4 font-semibold text-sm">Details</th>
-                            <th className="py-3 px-4 font-semibold text-sm">Amount Paid</th>
-                            <th className="py-3 px-4 font-semibold text-sm">Status</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {roomBookings.map((booking) => (
-                            <tr key={booking.id} className="border-b last:border-0 hover:bg-muted/10 transition-colors">
-                              <td className="py-3 px-4">
-                                <div className="font-medium text-foreground">{booking.userName}</div>
-                                <div className="text-xs text-muted-foreground">{booking.userPhone}</div>
-                              </td>
-                              <td className="py-3 px-4 font-medium">{booking.listingTitle}</td>
-                              <td className="py-3 px-4 text-xs text-muted-foreground">
-                                Booked on: {new Date(booking.createdAt).toLocaleDateString("en-IN")}
-                              </td>
-                              <td className="py-3 px-4 font-bold text-emerald-600 dark:text-emerald-400">
-                                ₹{booking.amount?.toLocaleString("en-IN")}
-                              </td>
-                              <td className="py-3 px-4">
-                                <Badge className="bg-success text-white">
-                                  {booking.status || "confirmed"}
-                                </Badge>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </div>
-
-                {/* Mess Subscriptions */}
-                <div className="bg-card rounded-2xl p-6 shadow-soft">
-                  <div className="flex items-center justify-between mb-6">
-                    <h2 className="font-heading font-semibold text-xl flex items-center gap-2">
-                      <UtensilsCrossed className="w-5 h-5 text-accent" />
-                      Mess Subscriptions
-                    </h2>
-                  </div>
-
-                  {loadingSubs ? (
-                    <div className="flex justify-center py-12">
-                      <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                    </div>
-                  ) : subscriptions.length === 0 ? (
-                    <div className="text-center py-12">
-                      <UtensilsCrossed className="w-16 h-16 mx-auto text-muted-foreground/50 mb-4" />
-                      <p className="text-muted-foreground">No mess subscriptions recorded yet</p>
-                    </div>
-                  ) : (
-                    <div className="overflow-x-auto border rounded-xl">
-                      <table className="w-full text-left border-collapse">
-                        <thead>
-                          <tr className="border-b bg-muted/30">
-                            <th className="py-3 px-4 font-semibold text-sm">Subscriber</th>
-                            <th className="py-3 px-4 font-semibold text-sm">Mess Title</th>
-                            <th className="py-3 px-4 font-semibold text-sm">Plan Type</th>
-                            <th className="py-3 px-4 font-semibold text-sm">Duration</th>
-                            <th className="py-3 px-4 font-semibold text-sm">Amount Paid</th>
-                            <th className="py-3 px-4 font-semibold text-sm">Status</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {subscriptions.map((sub) => (
-                            <tr key={sub.id} className="border-b last:border-0 hover:bg-muted/10 transition-colors">
-                              <td className="py-3 px-4">
-                                <div className="font-medium text-foreground">{sub.userName}</div>
-                                <div className="text-xs text-muted-foreground">{sub.userPhone}</div>
-                              </td>
-                              <td className="py-3 px-4 font-medium">{sub.messTitle}</td>
-                              <td className="py-3 px-4 capitalize">
-                                <Badge variant="outline" className="font-medium">
-                                  {sub.planType}
-                                </Badge>
-                              </td>
-                              <td className="py-3 px-4 text-xs text-muted-foreground">
-                                {new Date(sub.startDate).toLocaleDateString("en-IN")} - {new Date(sub.endDate).toLocaleDateString("en-IN")}
-                              </td>
-                              <td className="py-3 px-4 font-bold text-emerald-600 dark:text-emerald-400">
-                                ₹{sub.amount?.toLocaleString("en-IN")}
-                              </td>
-                              <td className="py-3 px-4">
-                                <Badge
-                                  className={
-                                    sub.status === "active"
-                                      ? "bg-success text-white"
-                                      : sub.status === "paused"
-                                      ? "bg-amber-500 text-white"
-                                      : "bg-destructive text-white"
-                                  }
-                                >
-                                  {sub.status}
-                                </Badge>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </div>
-              </div>
+              <OwnerBookingManager
+                userId={user?.id || ""}
+                listings={[
+                  ...myRooms.map((r) => ({ id: r.id, title: r.title })),
+                  ...myMess.map((m) => ({ id: m.id, title: m.name })),
+                ]}
+              />
             </TabsContent>
 
             {/* Add Room Tab */}

@@ -56,6 +56,7 @@ import {
 } from "@/services/razorpayService";
 import PaymentResultModal, { PaymentResult } from "@/components/payment/PaymentResultModal";
 import { downloadReceiptPDF, emailReceipt } from "@/services/receiptService";
+import { ListingAvailabilityCalendar } from "@/components/booking/ListingAvailabilityCalendar";
 
 interface ContactOwnerModalProps {
     isOpen: boolean;
@@ -501,6 +502,18 @@ const ContactOwnerModal = ({
                                 className={errors.userEmail ? "border-red-500" : ""}
                             />
                         </div>
+
+                        {/* Public Read-Only Availability Calendar */}
+                        {activeTab === "book" && (
+                            <div className="space-y-2">
+                                <ListingAvailabilityCalendar
+                                    listingId={listingId}
+                                    listingType={listingType}
+                                    selectedDate={formData.moveInDate}
+                                    onSelectDate={(dateStr) => setFormData((prev) => ({ ...prev, moveInDate: dateStr }))}
+                                />
+                            </div>
+                        )}
 
                         {/* Plan selection */}
                         {activeTab === "book" && (
